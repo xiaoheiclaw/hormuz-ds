@@ -149,8 +149,8 @@ class TestSignals:
 class TestRegimes:
     def test_get_latest_regime(self, tmp_db: Path):
         db = HormuzDB(tmp_db)
-        old = datetime(2025, 1, 1)
-        new = datetime(2025, 6, 1)
+        old = datetime(2025, 1, 1, tzinfo=UTC)
+        new = datetime(2025, 6, 1, tzinfo=UTC)
         db.insert_regime(Regime(
             timestamp=old, question="q1",
             regime=RegimeType.wide, trigger="init",
@@ -195,6 +195,42 @@ class TestMCParams:
         assert latest.path_weights.b == pytest.approx(0.5)
         assert latest.path_weights.c == pytest.approx(0.2)
         assert latest.trigger == "regime_change"
+
+
+class TestMCResults:
+    def test_insert_returns_id(self, tmp_db: Path):
+        db = HormuzDB(tmp_db)
+        now = datetime.now(UTC)
+        # Need a params row first for the FK
+        params = MCParams(
+            timestamp=now,
+            irgc_decay_mean=14.0,
+            convoy_start_mean=7.0,
+            disruption_range=(0.3, 0.7),
+            pipeline_max=1.5,
+            pipeline_ramp_weeks=4.0,
+            spr_rate_mean=1.0,
+            spr_delay_weeks=2.0,
+            surplus_buffer=1.5,
+            path_weights=PathWeights(a=0.3, b=0.5, c=0.2),
+            trigger="regime_change",
+        )
+        params_id = db.insert_mc_params(params)
+
+        result = MCResult(
+            timestamp=now,
+            params_id=params_id,
+            price_mean=95.0,
+            price_p10=80.0,
+            price_p50=93.0,
+            price_p90=115.0,
+            path_a_price=88.0,
+            path_b_price=95.0,
+            path_c_price=120.0,
+            key_dates={"escalation": now, "peak": now + timedelta(days=30)},
+        )
+        row_id = db.insert_mc_result(result)
+        assert row_id >= 1
 
 
 class TestPositionSignals:

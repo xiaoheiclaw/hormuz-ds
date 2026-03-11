@@ -1,7 +1,7 @@
 """SQLite database layer for the Hormuz decision support system."""
 import json
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from hormuz.models import (
@@ -82,8 +82,10 @@ CREATE TABLE IF NOT EXISTS position_signals (
 
 
 def _ts(dt: datetime) -> str:
-    """Datetime to ISO8601 string."""
-    return dt.isoformat()
+    """Datetime to ISO8601 UTC string. Naive datetimes assumed UTC."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat()
 
 
 def _dt(s: str) -> datetime:
@@ -321,7 +323,7 @@ class HormuzDB:
             "path_b_price": result.path_b_price,
             "path_c_price": result.path_c_price,
             "key_dates": result.key_dates,
-        })
+        }, default=str)
         cur = self._conn.execute(
             "INSERT INTO mc_results (timestamp, params_id, output) VALUES (?, ?, ?)",
             (_ts(result.timestamp), result.params_id, output_json),
