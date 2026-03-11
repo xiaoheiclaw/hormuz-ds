@@ -40,11 +40,11 @@ def _detect_t1(obs: Observation) -> bool:
 
 
 def _detect_t2(obs: Observation) -> bool:
-    return obs.category == "q1_attack" and obs.key == "t2_coastal_activation"
+    return obs.category == "q1_attack" and obs.key == "t2_multi_region"
 
 
 def _detect_t3(obs: Observation) -> bool:
-    return obs.category == "q2_mine" and obs.key == "t3_minelayer_departure"
+    return obs.category == "q2_mine" and obs.key == "t3_mining_boats"
 
 
 def _detect_e1(obs: Observation) -> bool:

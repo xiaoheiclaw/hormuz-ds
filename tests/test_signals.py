@@ -122,7 +122,7 @@ class TestTripwireDetection:
 
     def test_t2_coastal_positions(self, signal_engine: SignalEngine):
         """Multi-region coastal positions -> T2 triggered."""
-        obs = _obs(category="q1_attack", key="t2_coastal_activation")
+        obs = _obs(category="q1_attack", key="t2_multi_region")
         triggered = signal_engine.scan([obs])
 
         assert len(triggered) == 1
@@ -131,7 +131,7 @@ class TestTripwireDetection:
 
     def test_t3_minelayer_departure(self, signal_engine: SignalEngine):
         """Multiple minelayers depart -> T3 triggered."""
-        obs = _obs(category="q2_mine", key="t3_minelayer_departure")
+        obs = _obs(category="q2_mine", key="t3_mining_boats")
         triggered = signal_engine.scan([obs])
 
         assert len(triggered) == 1
