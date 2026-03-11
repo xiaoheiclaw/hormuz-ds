@@ -1,0 +1,42 @@
+version: "1.0"
+project: hormuz-ds
+
+directories:
+  src/hormuz/:
+    description: "Main package source"
+    allow: ["*.py"]
+  src/hormuz/engine/:
+    description: "Core engine modules (ach, physical, signals, schelling, mc, positions)"
+    allow: ["*.py"]
+  src/hormuz/llm/:
+    description: "LLM backend integration"
+    allow: ["*.py"]
+  configs/:
+    description: "YAML configuration files"
+    allow: ["*.yaml", "*.yml"]
+  tests/:
+    description: "Test files"
+    allow: ["*.py"]
+  templates/:
+    description: "Jinja2 HTML report templates"
+    allow: ["*.html", "*.j2"]
+  data/:
+    description: "SQLite DB and data files"
+    allow: ["*.db", "*.csv", "*.json", ".gitkeep"]
+  reports/:
+    description: "Generated weekly reports"
+    allow: ["*.html", "*.pdf", ".gitkeep"]
+  docs/:
+    description: "Documentation and plans"
+    allow: ["*.md", "*.yaml", "*.yml"]
+
+rules:
+  - name: no-config-in-root
+    description: "Configuration files go in configs/"
+    deny:
+      path: "/*.yaml"
+      except: [".structure.yml"]
+  - name: no-tests-in-src
+    description: "Tests belong in tests/"
+    deny:
+      path: "src/**/test_*.py"

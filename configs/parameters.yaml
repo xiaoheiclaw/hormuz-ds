@@ -1,0 +1,37 @@
+# Parameters — tunable, updated via calibration or human judgment
+
+physical:
+  q1:
+    irgc_decay_mean_weeks: 6.0
+    disruption_range: [0.55, 0.90]
+    attack_threshold_per_day: 2.0
+
+  q2:
+    mine_initial_stock: [2000, 6000]
+    convoy_start_mean_weeks: 5.0
+    sea_mines_current: 50
+    sweep_ships_available: 6
+
+  q3:
+    pipeline_max_mbd: 4.0
+    pipeline_ramp_weeks: 2.5
+    spr_rate_mean_mbd: 2.5
+    spr_delay_weeks: 2.5
+    surplus_buffer_mbd: 2.5
+
+paths:
+  a: 0.30
+  b: 0.50
+  c: 0.20
+
+positions:
+  energy_base_pct: 15
+  vol_base_pct: 3
+  recession_hedge_pct: 2
+  stop_loss:
+    brent_below: 80
+    days: 3
+  max_loss_pct: 8
+
+schelling:
+  max_delta_pp: 10

@@ -1,0 +1,255 @@
+# Physical constants — fixed, never change at runtime
+
+physical:
+  q1:
+    C1:
+      name: "coastline_terrain"
+      description: "IRGC coastal terrain advantage — caves, tunnels, mobile TELs"
+    C2:
+      name: "channel_width"
+      value_km: 9
+      description: "Navigable channel width at narrowest point"
+  q2:
+    C3:
+      name: "sweep_area"
+      description: "Total area requiring mine clearance in transit lanes"
+    C4:
+      name: "mine_types"
+      types: ["contact", "magnetic", "acoustic"]
+      description: "Known Iranian mine inventory types"
+    C5:
+      name: "single_ship_sweep_rate_ceiling"
+      description: "Maximum area one MCM vessel can clear per day"
+
+# ACH evidence definitions
+
+ach:
+  q1:
+    hypotheses:
+      h1: "Active IRGC campaign (high disruption)"
+      h2: "Limited/signaling strikes (moderate disruption)"
+      h3: "Deterred/restrained (minimal disruption)"
+    evidence:
+      - id: "q1_e1"
+        name: "ASBM launch rate"
+        discriminating_power: "high"
+        h1: "consistent"
+        h2: "consistent"
+        h3: "inconsistent"
+        source: "CENTCOM/ISR"
+        frequency: "daily"
+      - id: "q1_e2"
+        name: "FAC sortie count"
+        discriminating_power: "high"
+        h1: "consistent"
+        h2: "neutral"
+        h3: "inconsistent"
+        source: "CENTCOM/ISR"
+        frequency: "daily"
+      - id: "q1_e3"
+        name: "Mine-laying boat departures"
+        discriminating_power: "high"
+        h1: "consistent"
+        h2: "neutral"
+        h3: "inconsistent"
+        source: "ISR/AIS"
+        frequency: "daily"
+      - id: "q1_e4"
+        name: "IRGCN submarine activity"
+        discriminating_power: "medium"
+        h1: "consistent"
+        h2: "neutral"
+        h3: "inconsistent"
+        source: "CENTCOM/ISR"
+        frequency: "daily"
+      - id: "q1_e5"
+        name: "Coastal radar/C2 emissions"
+        discriminating_power: "medium"
+        h1: "consistent"
+        h2: "consistent"
+        h3: "neutral"
+        source: "SIGINT"
+        frequency: "daily"
+      - id: "q1_e6"
+        name: "IRGC leadership statements"
+        discriminating_power: "medium"
+        h1: "consistent"
+        h2: "consistent"
+        h3: "inconsistent"
+        source: "OSINT"
+        frequency: "as_available"
+      - id: "q1_e7"
+        name: "Proxy militia coordination signals"
+        discriminating_power: "medium"
+        h1: "consistent"
+        h2: "neutral"
+        h3: "inconsistent"
+        source: "SIGINT/OSINT"
+        frequency: "daily"
+      - id: "q1_e8"
+        name: "Civilian vessel damage reports"
+        discriminating_power: "high"
+        h1: "consistent"
+        h2: "consistent"
+        h3: "inconsistent"
+        source: "Lloyd's List/IMO"
+        frequency: "as_available"
+      - id: "q1_e9"
+        name: "Insurance/war risk premium"
+        discriminating_power: "low"
+        h1: "consistent"
+        h2: "consistent"
+        h3: "neutral"
+        source: "Lloyd's List"
+        frequency: "weekly"
+
+  q2:
+    hypotheses:
+      h1: "Mines dominate — slow clearance (>8 weeks)"
+      h2: "Manageable — clearance in 4-8 weeks"
+    evidence:
+      - id: "q2_e1"
+        name: "Confirmed mine strikes"
+        discriminating_power: "high"
+        h1: "consistent"
+        h2: "neutral"
+        source: "Lloyd's List/CENTCOM"
+        frequency: "as_available"
+      - id: "q2_e2"
+        name: "MCM vessel deployment count"
+        discriminating_power: "high"
+        h1: "neutral"
+        h2: "consistent"
+        source: "CENTCOM"
+        frequency: "weekly"
+      - id: "q2_e3"
+        name: "Cleared lane reopening rate"
+        discriminating_power: "high"
+        h1: "inconsistent"
+        h2: "consistent"
+        source: "CENTCOM/IMO"
+        frequency: "weekly"
+      - id: "q2_e4"
+        name: "New mine sightings in cleared areas"
+        discriminating_power: "high"
+        h1: "consistent"
+        h2: "inconsistent"
+        source: "CENTCOM"
+        frequency: "daily"
+      - id: "q2_e5"
+        name: "Mine type diversity observed"
+        discriminating_power: "medium"
+        h1: "consistent"
+        h2: "neutral"
+        source: "CENTCOM"
+        frequency: "as_available"
+      - id: "q2_e6"
+        name: "Convoy formation reports"
+        discriminating_power: "medium"
+        h1: "consistent"
+        h2: "neutral"
+        source: "TradeWinds/AIS"
+        frequency: "daily"
+      - id: "q2_e7"
+        name: "Alternative route tanker traffic"
+        discriminating_power: "low"
+        h1: "consistent"
+        h2: "neutral"
+        source: "AIS/TradeWinds"
+        frequency: "weekly"
+
+# Signal definitions
+
+signals:
+  grabo_tripwires:
+    - id: "T1"
+      name: "Missile platform movement"
+      description: "ASBM/ASCM TEL relocation to launch positions"
+      revert_hours: 48
+    - id: "T2"
+      name: "Multi-region activation"
+      description: "Simultaneous IRGC activity across multiple sectors"
+      revert_hours: 48
+    - id: "T3"
+      name: "Mining boats departing"
+      description: "Mine-laying vessels leaving port"
+      revert_hours: 48
+
+  event_triggers:
+    - id: "E1"
+      name: "Infrastructure attack"
+      description: "Strike on port/terminal/pipeline infrastructure"
+      revert_hours: null
+      cross_layer: "schelling_4"
+    - id: "E2"
+      name: "Minesweeper attack"
+      description: "Attack on MCM vessel during clearance ops"
+      revert_hours: null
+    - id: "E3"
+      name: "Mine strike"
+      description: "Vessel strikes mine in transit lane"
+      revert_hours: null
+    - id: "E4"
+      name: "New area mining"
+      description: "Mines detected in previously clear area"
+      revert_hours: 48
+
+  confirmations:
+    - id: "C1"
+      name: "Non-Iranian weapons"
+      description: "Evidence of non-Iranian state weapons in theater"
+    - id: "C2"
+      name: "Mines in cleared lanes"
+      description: "Re-mining of lanes declared clear"
+
+# Schelling signal table
+
+schelling:
+  signals:
+    - id: 1
+      name: "External mediator engagement"
+      class: "A"
+      description: "Third-party mediation effort (e.g., Oman, Qatar, China)"
+      requires_combo: null
+    - id: 2
+      name: "US signal inconsistency"
+      class: "A"
+      description: "Contradictory US messaging suggesting internal policy conflict"
+      requires_combo: null
+    - id: 3
+      name: "Costly self-binding"
+      class: "A"
+      description: "One side makes costly commitment to de-escalation"
+      requires_combo: null
+    - id: 4
+      name: "IRGC infrastructure escalation"
+      class: "A"
+      description: "IRGC escalation against oil infrastructure (cross-layer with E1)"
+      requires_combo: null
+    - id: 5
+      name: "Peace window"
+      class: "B"
+      description: "Diplomatic window opening — requires combo to confirm"
+      requires_combo: [1, 3]
+    - id: 6
+      name: "IRGC fragmentation"
+      class: "B"
+      description: "Signs of IRGC internal disagreement — requires combo to confirm"
+      requires_combo: [2]
+
+# Calibration references
+
+calibration:
+  references:
+    - name: "Operation Praying Mantis"
+      year: 1988
+      description: "US-Iran naval engagement; one-day operation, limited escalation"
+      relevance: "Baseline for Q1 active disruption scenario duration"
+    - name: "Gulf War mine clearance"
+      year: 1991
+      description: "Post-war MCM operations in Persian Gulf"
+      relevance: "Calibration for Q2 sweep timeline estimates"
+    - name: "Wonsan mine blockade"
+      year: 1950
+      description: "Korean War — 3000 mines, 2-week delay for amphibious landing"
+      relevance: "Upper bound calibration for dense mine scenario"
