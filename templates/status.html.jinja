@@ -51,7 +51,32 @@
 </style>
 </head>
 <body>
-<h1>Hormuz 决策仪表盘{% if is_weekly %} — 周报 {{ week_label }}{% endif %}</h1>
+{% set source_zh = {
+  "yfinance": "行情", "llm": "LLM提取", "manual": "人工",
+  "centcom": "美军中央司令部", "readwise": "新闻源"
+} %}
+{% set category_zh = {
+  "q1_attack": "Q1 主动威胁", "q2_mine": "Q2 水雷",
+  "q3_buffer": "Q3 缓冲", "market": "市场", "schelling": "博弈信号"
+} %}
+{% set key_zh = {
+  "brent_close": "布伦特收盘", "ovx_close": "OVX波动率",
+  "attack_event": "攻击事件", "attack_frequency": "攻击频率",
+  "mine_strike": "触雷", "new_area_mining": "新区布雷",
+  "mine_in_cleared_lane": "清扫航道再布雷",
+  "transit_volume": "通行量", "war_risk_premium": "战争险溢价",
+  "spr_release": "SPR释放", "pipeline_flow": "管道流量",
+  "gps_spoofing_cluster": "GPS欺骗集群",
+  "weapon_analysis": "武器分析", "attack": "攻击",
+  "brent_price": "布伦特价格", "portfolio_loss_pct": "组合亏损%"
+} %}
+{% set regime_zh = {
+  "wide": "宽分布", "lean_h1": "倾向H1", "lean_h2": "倾向H2", "confirmed_h3": "确认H3"
+} %}
+{% set status_zh = {
+  "inactive": "未激活", "triggered": "已触发", "confirmed": "已确认", "reverted": "已回退"
+} %}
+<h1>霍尔木兹决策仪表盘{% if is_weekly %} — 周报 {{ week_label }}{% endif %}</h1>
 <div class="ts">生成时间: {{ generated_at }}</div>
 
 <div class="grid" style="margin-top: 16px;">
@@ -82,21 +107,23 @@
   <div class="kv">
     <span class="kv-label">Q1 主动威胁</span>
     <span>{% if q1_regime %}
-      {% if q1_regime.regime.value == 'wide' %}<span class="badge badge-green">{{ q1_regime.regime.value }}</span>
-      {% elif q1_regime.regime.value == 'confirmed_h3' %}<span class="badge badge-red">{{ q1_regime.regime.value }}</span>
-      {% else %}<span class="badge badge-yellow">{{ q1_regime.regime.value }}</span>{% endif %}
-    {% else %}<span class="badge badge-grey">wide (默认)</span>{% endif %}</span>
+      {% set rv = q1_regime.regime.value %}
+      {% if rv == 'wide' %}<span class="badge badge-green">{{ regime_zh.get(rv, rv) }}</span>
+      {% elif rv == 'confirmed_h3' %}<span class="badge badge-red">{{ regime_zh.get(rv, rv) }}</span>
+      {% else %}<span class="badge badge-yellow">{{ regime_zh.get(rv, rv) }}</span>{% endif %}
+    {% else %}<span class="badge badge-grey">宽分布 (默认)</span>{% endif %}</span>
   </div>
   <div class="kv">
     <span class="kv-label">Q2 水雷威胁</span>
     <span>{% if q2_regime %}
-      {% if q2_regime.regime.value == 'wide' %}<span class="badge badge-green">{{ q2_regime.regime.value }}</span>
-      {% elif q2_regime.regime.value == 'confirmed_h3' %}<span class="badge badge-red">{{ q2_regime.regime.value }}</span>
-      {% else %}<span class="badge badge-yellow">{{ q2_regime.regime.value }}</span>{% endif %}
-    {% else %}<span class="badge badge-grey">wide (默认)</span>{% endif %}</span>
+      {% set rv = q2_regime.regime.value %}
+      {% if rv == 'wide' %}<span class="badge badge-green">{{ regime_zh.get(rv, rv) }}</span>
+      {% elif rv == 'confirmed_h3' %}<span class="badge badge-red">{{ regime_zh.get(rv, rv) }}</span>
+      {% else %}<span class="badge badge-yellow">{{ regime_zh.get(rv, rv) }}</span>{% endif %}
+    {% else %}<span class="badge badge-grey">宽分布 (默认)</span>{% endif %}</span>
   </div>
   <div style="margin-top: 8px; font-size: 12px; color: #8b949e;">
-    H3 suspended (v5.4) · 收敛阈值: 3 高判别力同向
+    H3 已暂停 (v5.4) · 收敛阈值: 3 高判别力同向
   </div>
 </div>
 
@@ -106,9 +133,9 @@
   {% if phys_params %}
   <div class="kv"><span class="kv-label">IRGC 衰减均值</span><span class="kv-value">{{ phys_params.irgc_decay_mean }} 周</span></div>
   <div class="kv"><span class="kv-label">护航启动均值</span><span class="kv-value">{{ phys_params.convoy_start_mean }} 周</span></div>
-  <div class="kv"><span class="kv-label">总中断缺口</span><span class="kv-value">16.0 mbd (80% step)</span></div>
-  <div class="kv"><span class="kv-label">管道替代上限</span><span class="kv-value">{{ phys_params.pipeline_max }} mbd</span></div>
-  <div class="kv"><span class="kv-label">SPR 释放速率</span><span class="kv-value">{{ phys_params.spr_rate_mean }} mbd</span></div>
+  <div class="kv"><span class="kv-label">总中断缺口</span><span class="kv-value">16.0 百万桶/日 (80%阶跃)</span></div>
+  <div class="kv"><span class="kv-label">管道替代上限</span><span class="kv-value">{{ phys_params.pipeline_max }} 百万桶/日</span></div>
+  <div class="kv"><span class="kv-label">战略储备释放</span><span class="kv-value">{{ phys_params.spr_rate_mean }} 百万桶/日</span></div>
   {% else %}
   <div class="empty">暂无物理参数</div>
   {% endif %}
@@ -116,14 +143,14 @@
 
 {# ===== 4. 绊线状态 ===== #}
 <div class="panel panel-wide">
-  <h2>Grabo 绊线</h2>
+  <h2>格拉博绊线</h2>
   <div style="display: flex; gap: 24px; flex-wrap: wrap;">
     <div>
       <strong style="color:#8b949e;">绊线 (T)</strong><br>
       {% for sid in ['T1a', 'T1b', 'T2', 'T3'] %}
         {% set status = signal_map.get(sid, 'inactive') %}
         <span class="dot dot-{{ status_color(status) }}"></span>{{ sid }}
-        {% if status != 'inactive' %}<span style="color:#8b949e;font-size:11px;">({{ status }})</span>{% endif %}
+        {% if status != 'inactive' %}<span style="color:#8b949e;font-size:11px;">({{ status_zh.get(status, status) }})</span>{% endif %}
         &nbsp;
       {% endfor %}
     </div>
@@ -132,7 +159,7 @@
       {% for sid in ['E1', 'E2', 'E3', 'E4'] %}
         {% set status = signal_map.get(sid, 'inactive') %}
         <span class="dot dot-{{ status_color(status) }}"></span>{{ sid }}
-        {% if status != 'inactive' %}<span style="color:#8b949e;font-size:11px;">({{ status }})</span>{% endif %}
+        {% if status != 'inactive' %}<span style="color:#8b949e;font-size:11px;">({{ status_zh.get(status, status) }})</span>{% endif %}
         &nbsp;
       {% endfor %}
     </div>
@@ -141,7 +168,7 @@
       {% for sid in ['C1', 'C2'] %}
         {% set status = signal_map.get(sid, 'inactive') %}
         <span class="dot dot-{{ status_color(status) }}"></span>{{ sid }}
-        {% if status != 'inactive' %}<span style="color:#8b949e;font-size:11px;">({{ status }})</span>{% endif %}
+        {% if status != 'inactive' %}<span style="color:#8b949e;font-size:11px;">({{ status_zh.get(status, status) }})</span>{% endif %}
         &nbsp;
       {% endfor %}
     </div>
@@ -157,9 +184,9 @@
     {% for obs in recent_observations[-10:] %}
     <tr>
       <td class="ts">{{ obs.timestamp.strftime('%m-%d %H:%M') }}</td>
-      <td>{{ obs.source }}</td>
-      <td>{{ obs.category }}</td>
-      <td>{{ obs.key }}</td>
+      <td>{{ source_zh.get(obs.source, obs.source) }}</td>
+      <td>{{ category_zh.get(obs.category, obs.category) }}</td>
+      <td>{{ key_zh.get(obs.key, obs.key) }}</td>
       <td>{{ obs.value }}</td>
     </tr>
     {% endfor %}
@@ -192,7 +219,7 @@
 <div class="panel">
   <h2>市场参考</h2>
   {% if latest_brent is not none %}
-  <div class="kv"><span class="kv-label">Brent 收盘</span><span class="kv-value">${{ "%.1f"|format(latest_brent) }}</span></div>
+  <div class="kv"><span class="kv-label">布伦特收盘</span><span class="kv-value">${{ "%.1f"|format(latest_brent) }}</span></div>
   {% else %}
   <div class="empty">暂无市场数据</div>
   {% endif %}

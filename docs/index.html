@@ -51,8 +51,13 @@
 </style>
 </head>
 <body>
-<h1>Hormuz 决策仪表盘</h1>
-<div class="ts">生成时间: 2026-03-12 09:07 UTC</div>
+
+
+
+
+
+<h1>霍尔木兹决策仪表盘</h1>
+<div class="ts">生成时间: 2026-03-12 09:13 UTC</div>
 
 <div class="grid" style="margin-top: 16px;">
 
@@ -70,14 +75,14 @@
   <h2>ACH 制度</h2>
   <div class="kv">
     <span class="kv-label">Q1 主动威胁</span>
-    <span><span class="badge badge-grey">wide (默认)</span></span>
+    <span><span class="badge badge-grey">宽分布 (默认)</span></span>
   </div>
   <div class="kv">
     <span class="kv-label">Q2 水雷威胁</span>
-    <span><span class="badge badge-grey">wide (默认)</span></span>
+    <span><span class="badge badge-grey">宽分布 (默认)</span></span>
   </div>
   <div style="margin-top: 8px; font-size: 12px; color: #8b949e;">
-    H3 suspended (v5.4) · 收敛阈值: 3 高判别力同向
+    H3 已暂停 (v5.4) · 收敛阈值: 3 高判别力同向
   </div>
 </div>
 
@@ -87,15 +92,15 @@
   
   <div class="kv"><span class="kv-label">IRGC 衰减均值</span><span class="kv-value">6.0 周</span></div>
   <div class="kv"><span class="kv-label">护航启动均值</span><span class="kv-value">5.0 周</span></div>
-  <div class="kv"><span class="kv-label">总中断缺口</span><span class="kv-value">16.0 mbd (80% step)</span></div>
-  <div class="kv"><span class="kv-label">管道替代上限</span><span class="kv-value">4.0 mbd</span></div>
-  <div class="kv"><span class="kv-label">SPR 释放速率</span><span class="kv-value">2.5 mbd</span></div>
+  <div class="kv"><span class="kv-label">总中断缺口</span><span class="kv-value">16.0 百万桶/日 (80%阶跃)</span></div>
+  <div class="kv"><span class="kv-label">管道替代上限</span><span class="kv-value">4.0 百万桶/日</span></div>
+  <div class="kv"><span class="kv-label">战略储备释放</span><span class="kv-value">2.5 百万桶/日</span></div>
   
 </div>
 
 
 <div class="panel panel-wide">
-  <h2>Grabo 绊线</h2>
+  <h2>格拉博绊线</h2>
   <div style="display: flex; gap: 24px; flex-wrap: wrap;">
     <div>
       <strong style="color:#8b949e;">绊线 (T)</strong><br>
@@ -171,80 +176,80 @@
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>yfinance</td>
-      <td>market</td>
-      <td>ovx_close</td>
+      <td>行情</td>
+      <td>市场</td>
+      <td>OVX波动率</td>
       <td>120.91000366210938</td>
     </tr>
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>llm</td>
-      <td>q3_buffer</td>
-      <td>spr_release</td>
+      <td>LLM提取</td>
+      <td>Q3 缓冲</td>
+      <td>SPR释放</td>
       <td>172000000.0</td>
     </tr>
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>llm</td>
-      <td>q1_attack</td>
-      <td>attack_event</td>
+      <td>LLM提取</td>
+      <td>Q1 主动威胁</td>
+      <td>攻击事件</td>
       <td>1.0</td>
     </tr>
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>llm</td>
-      <td>market</td>
-      <td>war_risk_premium</td>
+      <td>LLM提取</td>
+      <td>市场</td>
+      <td>战争险溢价</td>
       <td>1.0</td>
     </tr>
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>llm</td>
-      <td>q1_attack</td>
-      <td>attack_event</td>
+      <td>LLM提取</td>
+      <td>Q1 主动威胁</td>
+      <td>攻击事件</td>
       <td>1.0</td>
     </tr>
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>llm</td>
-      <td>q1_attack</td>
-      <td>attack_frequency</td>
+      <td>LLM提取</td>
+      <td>Q1 主动威胁</td>
+      <td>攻击频率</td>
       <td>2.0</td>
     </tr>
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>llm</td>
-      <td>schelling</td>
+      <td>LLM提取</td>
+      <td>博弈信号</td>
       <td>t1_platform_movement</td>
       <td>1.0</td>
     </tr>
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>llm</td>
-      <td>q1_attack</td>
-      <td>attack_event</td>
+      <td>LLM提取</td>
+      <td>Q1 主动威胁</td>
+      <td>攻击事件</td>
       <td>1.0</td>
     </tr>
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>llm</td>
-      <td>schelling</td>
+      <td>LLM提取</td>
+      <td>博弈信号</td>
       <td>t2_multi_region</td>
       <td>1.0</td>
     </tr>
     
     <tr>
       <td class="ts">03-12 09:03</td>
-      <td>llm</td>
-      <td>schelling</td>
+      <td>LLM提取</td>
+      <td>博弈信号</td>
       <td>e1_civilian_casualty</td>
       <td>1.0</td>
     </tr>
@@ -286,7 +291,7 @@
 <div class="panel">
   <h2>市场参考</h2>
   
-  <div class="kv"><span class="kv-label">Brent 收盘</span><span class="kv-value">$94.0</span></div>
+  <div class="kv"><span class="kv-label">布伦特收盘</span><span class="kv-value">$94.0</span></div>
   
 </div>
 
@@ -294,6 +299,6 @@
 
 
 
-<footer>hormuz-ds · 生成于 2026-03-12 09:07 UTC</footer>
+<footer>hormuz-ds · 生成于 2026-03-12 09:13 UTC</footer>
 </body>
 </html>

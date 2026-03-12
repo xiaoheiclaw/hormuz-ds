@@ -63,7 +63,7 @@ class TestStatusReport:
         assert "ABC 路径权重" in content
         assert "ACH 制度" in content
         assert "物理参数" in content
-        assert "Grabo 绊线" in content
+        assert "格拉博绊线" in content
         assert "近期观测" in content
 
     def test_shows_path_weights(self, reporter):
@@ -117,7 +117,7 @@ class TestStatusReport:
         path = reporter.update_status()
         content = path.read_text()
         assert "<!DOCTYPE html>" in content
-        assert "ABC 路径权重" in content
+        assert "霍尔木兹决策仪表盘" in content
 
 
 class TestWeeklyArchive:
