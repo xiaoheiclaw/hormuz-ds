@@ -174,8 +174,7 @@ class TestMCParams:
             timestamp=now,
             irgc_decay_mean=14.0,
             convoy_start_mean=7.0,
-            disruption_range=(0.3, 0.7),
-            pipeline_max=1.5,
+                        pipeline_max=1.5,
             pipeline_ramp_weeks=4.0,
             spr_rate_mean=1.0,
             spr_delay_weeks=2.0,
@@ -190,7 +189,6 @@ class TestMCParams:
         assert latest is not None
         assert latest.id == row_id
         assert latest.irgc_decay_mean == 14.0
-        assert latest.disruption_range == (0.3, 0.7)
         assert latest.path_weights.a == pytest.approx(0.3)
         assert latest.path_weights.b == pytest.approx(0.5)
         assert latest.path_weights.c == pytest.approx(0.2)
@@ -206,8 +204,7 @@ class TestMCResults:
             timestamp=now,
             irgc_decay_mean=14.0,
             convoy_start_mean=7.0,
-            disruption_range=(0.3, 0.7),
-            pipeline_max=1.5,
+                        pipeline_max=1.5,
             pipeline_ramp_weeks=4.0,
             spr_rate_mean=1.0,
             spr_delay_weeks=2.0,

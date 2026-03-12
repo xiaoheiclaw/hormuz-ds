@@ -1,19 +1,18 @@
 readwise:
   token: "${READWISE_TOKEN}"
-  tag: "hormuz"
+  tag: "geopulse"
   sources:
-    - "CENTCOM"
+    - "gCaptain"
+    - "Splash247"
+    - "Al-Monitor"
     - "Reuters"
-    - "Lloyd's List"
-    - "TradeWinds"
-    - "IMO"
     - "OilPrice.com"
     - "Iran International"
   proxy: "http://127.0.0.1:7890"
   timeout: 30
 
 llm:
-  backend: "openclaw"
+  backend: "claude_api"
   openclaw:
     endpoint: "${OPENCLAW_ENDPOINT}"
   claude_api:

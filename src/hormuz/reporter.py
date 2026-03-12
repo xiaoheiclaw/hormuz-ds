@@ -5,7 +5,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from hormuz.db import HormuzDB
-from hormuz.models import SignalStatus
+from hormuz.models import RegimeType, SignalStatus
 
 # Conflict start date — used to calculate current week number
 _CONFLICT_START = datetime(2025, 6, 1, tzinfo=UTC)
@@ -33,23 +33,29 @@ class Reporter:
         template_dir: Path,
         output_dir: Path,
         reports_dir: Path,
+        config_dir: Path | None = None,
     ) -> None:
         self.db = db
         self.output_dir = output_dir
         self.reports_dir = reports_dir
+        self.config_dir = config_dir
         self._env = Environment(
             loader=FileSystemLoader(str(template_dir)),
             autoescape=False,
         )
         self._env.globals["status_color"] = _status_color
 
-    def update_status(self) -> Path:
+    def update_status(self, docs_dir: Path | None = None) -> Path:
         """Generate/overwrite status.html with current system state."""
         data = self._gather_status_data()
         data["is_weekly"] = False
         html = self._render("status.html.jinja", data)
         out = self.output_dir / "status.html"
         out.write_text(html, encoding="utf-8")
+        # Also write to docs/index.html for GitHub Pages
+        if docs_dir:
+            pages_out = docs_dir / "index.html"
+            pages_out.write_text(html, encoding="utf-8")
         return out
 
     def archive_weekly(self, force: bool = False) -> Path | None:
@@ -90,12 +96,25 @@ class Reporter:
         q1_regime = self.db.get_latest_regime("q1")
         q2_regime = self.db.get_latest_regime("q2")
 
-        # MC params + path weights
+        # Path weights from latest MC params (if any)
         mc_params = self.db.get_latest_mc_params()
         path_weights = mc_params.path_weights if mc_params else None
 
-        # MC result (latest)
-        mc_result = self._get_latest_mc_result()
+        # Physical params: derive from current regimes
+        from hormuz.engine.physical import PhysicalLayer
+        phys_params = None
+        try:
+            # Read parameters.yaml to get physical config
+            import yaml
+            params_path = (self.config_dir or self.output_dir.parent / "configs") / "parameters.yaml"
+            if params_path.exists():
+                parameters = yaml.safe_load(params_path.read_text())
+                physical = PhysicalLayer(parameters["physical"])
+                q1_r = q1_regime.regime if q1_regime else RegimeType.wide
+                q2_r = q2_regime.regime if q2_regime else RegimeType.wide
+                phys_params = physical.update_params(q1_r, q2_r)
+        except Exception:
+            pass
 
         # Active signals → build signal_id → status map
         active_signals = self.db.get_active_signals()
@@ -118,9 +137,6 @@ class Reporter:
         # Schelling observations
         schelling_observations = self.db.get_observations_since(since_7d, category="schelling")
 
-        # Unexecuted position signals
-        positions = self.db.get_unexecuted_position_signals()
-
         # Week number
         delta = now - _CONFLICT_START
         week_number = max(1, int(delta.days / 7) + 1)
@@ -130,43 +146,16 @@ class Reporter:
             "week_number": week_number,
             "q1_regime": q1_regime,
             "q2_regime": q2_regime,
-            "mc_params": mc_params,
             "path_weights": path_weights,
-            "mc_result": mc_result,
+            "phys_params": phys_params,
             "signals": active_signals,
             "signal_map": signal_map,
             "recent_observations": recent_observations,
             "latest_brent": latest_brent,
             "schelling_observations": schelling_observations,
-            "positions": positions,
         }
 
     def _render(self, template_name: str, data: dict) -> str:
         """Render Jinja2 template with data."""
         template = self._env.get_template(template_name)
         return template.render(**data)
-
-    def _get_latest_mc_result(self):
-        """Get latest MC result from DB."""
-        from hormuz.models import MCResult
-        row = self.db._conn.execute(
-            "SELECT * FROM mc_results ORDER BY timestamp DESC LIMIT 1"
-        ).fetchone()
-        if row is None:
-            return None
-        import json
-        from hormuz.db import _dt
-        output = json.loads(row["output"])
-        return MCResult(
-            id=row["id"],
-            timestamp=_dt(row["timestamp"]),
-            params_id=row["params_id"],
-            price_mean=output["price_mean"],
-            price_p10=output["price_p10"],
-            price_p50=output["price_p50"],
-            price_p90=output["price_p90"],
-            path_a_price=output["path_a_price"],
-            path_b_price=output["path_b_price"],
-            path_c_price=output["path_c_price"],
-            key_dates=output.get("key_dates"),
-        )

@@ -273,7 +273,6 @@ class HormuzDB:
         params_json = json.dumps({
             "irgc_decay_mean": params.irgc_decay_mean,
             "convoy_start_mean": params.convoy_start_mean,
-            "disruption_range": list(params.disruption_range),
             "pipeline_max": params.pipeline_max,
             "pipeline_ramp_weeks": params.pipeline_ramp_weeks,
             "spr_rate_mean": params.spr_rate_mean,
@@ -301,7 +300,6 @@ class HormuzDB:
             timestamp=_dt(row["timestamp"]),
             irgc_decay_mean=p["irgc_decay_mean"],
             convoy_start_mean=p["convoy_start_mean"],
-            disruption_range=tuple(p["disruption_range"]),
             pipeline_max=p["pipeline_max"],
             pipeline_ramp_weeks=p["pipeline_ramp_weeks"],
             spr_rate_mean=p["spr_rate_mean"],

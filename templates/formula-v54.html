@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>霍尔木兹 · 总缺口公式 v4</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #07090f;
+  font-family: 'Courier New', monospace;
+  color: #e2e8f0;
+  min-height: 100vh;
+  padding: 40px 24px 72px;
+}
+.wrap { max-width: 960px; margin: 0 auto; }
+
+.hdr { text-align:center; margin-bottom:42px; }
+.hdr-eyebrow { font-size:12px; color:#334155; letter-spacing:4px; margin-bottom:10px; }
+.hdr-title { font-size:26px; font-weight:700; color:#f8fafc; }
+.hdr-sub { font-size:13px; color:#475569; margin-top:8px; line-height:1.6; }
+
+.sec-label { font-size:12px; color:#475569; letter-spacing:3px; margin-bottom:10px; padding-left:2px; }
+
+/* ── MASTER FORMULA ── */
+.master-formula {
+  display:flex; align-items:stretch; gap:0;
+  background:#0a0e1a; border:1px solid #1e293b;
+  border-radius:12px; overflow:hidden; margin-bottom:6px;
+}
+.mf-cell {
+  flex:1; padding:24px 20px; text-align:center;
+  cursor:pointer; transition:background 0.2s;
+  border-right:1px solid #1e293b;
+}
+.mf-cell:hover { filter:brightness(1.2); }
+.mf-cell-label { font-size:11px; letter-spacing:2px; margin-bottom:10px; }
+.mf-cell-value { font-size:28px; font-weight:800; line-height:1; }
+.mf-cell-unit { font-size:12px; margin-top:6px; opacity:0.6; }
+.mf-cell-hint { font-size:11px; margin-top:8px; opacity:0.4; }
+.mf-op { display:flex;align-items:center;justify-content:center; font-size:32px;color:#1e3a5f;font-weight:300; padding:0 6px; background:#070b10; border-right:1px solid #1e293b; min-width:40px; }
+.mf-eq { display:flex;align-items:center;justify-content:center; font-size:26px;color:#334155; padding:0 12px; background:#070b10; border-right:1px solid #1e293b; min-width:50px; }
+.mf-result { flex:1.3; padding:24px 22px; text-align:center; background:#f59e0b06; }
+
+/* ── EXPAND PANELS ── */
+.expand-row { display:flex; gap:14px; margin-bottom:8px; }
+.expand-panel { flex:1; border-radius:10px; border:1px solid #1e293b; border-top-width:3px; overflow:hidden; display:none; }
+.expand-panel.open { display:block; animation:fadein 0.2s ease; }
+
+/* ── SCHELLING LAYER ── */
+.schelling-bar {
+  border:1px solid #8b5cf644;
+  border-left:3px solid #8b5cf6;
+  background:#8b5cf606;
+  border-radius:10px;
+  overflow:hidden;
+  margin-bottom:8px;
+}
+.sb-header {
+  padding:14px 20px;
+  display:flex; align-items:center; gap:14px;
+  cursor:pointer;
+  border-bottom:1px solid transparent;
+  transition:border-color 0.2s;
+}
+.sb-header.open { border-bottom-color:#1e293b; }
+.sb-badge { background:#8b5cf6; color:#fff; font-size:12px; font-weight:800; padding:3px 10px; border-radius:3px; }
+.sb-title { font-size:15px; color:#a78bfa; font-weight:600; }
+.sb-role { font-size:12px; color:#475569; margin-left:auto; }
+.sb-chev { font-size:13px; color:#475569; }
+.sb-body { display:none; padding:20px 22px; }
+.sb-body.open { display:block; animation:fadein 0.2s ease; }
+
+.diag-row { display:flex; gap:12px; margin-bottom:16px; }
+.diag-card {
+  flex:1; background:#0a0e1a; border-radius:8px; padding:16px 16px;
+  border-top:2px solid transparent;
+}
+.dc-name { font-size:13px; font-weight:700; margin-bottom:6px; }
+.dc-question { font-size:12px; color:#64748b; margin-bottom:10px; line-height:1.5; }
+.dc-signal { font-size:12px; margin-bottom:4px; line-height:1.5; }
+.dc-effect { font-size:12px; padding:6px 10px; border-radius:4px; margin-top:8px; }
+
+.signal-table { width:100%; border-collapse:collapse; font-size:12px; }
+.signal-table th { color:#475569; font-weight:400; letter-spacing:1px; padding:7px 10px; text-align:left; border-bottom:1px solid #1e293b; }
+.signal-table td { padding:8px 10px; border-bottom:1px solid #0f172a; color:#64748b; vertical-align:top; line-height:1.5; }
+.signal-table tr:last-child td { border-bottom:none; }
+.sig-dir { font-size:13px; font-weight:700; white-space:nowrap; }
+
+/* ── CONNECTOR ── */
+.connector { display:flex;flex-direction:column;align-items:center; padding:6px 0; }
+.conn-line { width:1.5px; }
+.conn-head { width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent; }
+.conn-label { font-size:12px; margin-top:5px; }
+
+/* ── RESULT BOX ── */
+.result-box { border:1px solid #f59e0b88; background:linear-gradient(135deg,#f59e0b08,#f59e0b03); border-radius:12px; padding:26px 28px; box-shadow:0 0 40px #f59e0b0d; margin-bottom:8px; }
+.rb-label { font-size:12px; color:#f59e0b; letter-spacing:3px; margin-bottom:12px; }
+.rb-formula { font-size:18px; color:#fbbf24; font-weight:700; margin-bottom:8px; }
+.rb-note { font-size:12px; color:#334155; margin-bottom:18px; }
+.rb-grid { display:flex; gap:12px; }
+.rb-col { flex:1; background:#0a0e1a; border-radius:8px; padding:16px 16px; border-top:3px solid transparent; }
+.rbc-label { font-size:11px; color:#475569; letter-spacing:2px; margin-bottom:10px; }
+
+/* calc breakdown */
+.calc-row { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+.calc-line { display:flex; justify-content:space-between; font-size:12px; }
+.calc-line .dim { color:#334155; }
+.calc-line .val { color:#64748b; }
+.calc-divider { height:1px; background:#1e293b; margin:5px 0; }
+.calc-total { display:flex; justify-content:space-between; font-size:16px; font-weight:800; margin-bottom:8px; }
+.rbc-note { font-size:11px; color:#475569; line-height:1.6; }
+
+/* prob badge */
+.prob-badge { display:inline-block; font-size:14px; padding:3px 10px; border-radius:10px; margin-bottom:8px; font-weight:700; }
+
+/* positions */
+.pos-grid { display:flex; gap:12px; }
+.pos-card { flex:1; border-radius:8px; padding:18px; text-align:center; border:1px solid transparent; }
+.pos-size { font-size:26px; font-weight:800; }
+.pos-name { font-size:14px; color:#e2e8f0; margin:4px 0; }
+.pos-inst { font-size:12px; color:#475569; }
+.pos-note { font-size:11px; color:#334155; margin-top:8px; }
+
+/* exit */
+.exit-box { border:1px solid #1e293b; border-radius:10px; overflow:hidden; }
+.exit-hdr { background:#0c1018; padding:12px 18px; font-size:12px; color:#475569; letter-spacing:3px; }
+.exit-row { display:flex; gap:16px; padding:14px 18px; border-top:1px solid #1e293b; }
+.exit-icon { font-size:18px; min-width:26px; }
+.exit-trigger { font-size:13px; color:#94a3b8; margin-bottom:4px; }
+.exit-action { font-size:12px; color:#475569; }
+
+.footer { text-align:center; margin-top:40px; font-size:11px; color:#1e293b; letter-spacing:2px; }
+
+@keyframes glow { 0%,100%{color:#f97316;} 50%{color:#fb923c;} }
+.pulse { animation:glow 2s infinite; }
+@keyframes fadein { from{opacity:0;transform:translateY(-4px);} to{opacity:1;transform:translateY(0);} }
+
+.panel-inner-row { display:flex; }
+.panel-col { flex:1; padding:18px 20px; }
+.panel-col + .panel-col { border-left:1px solid #1e293b; }
+.pl { font-size:11px; color:#475569; letter-spacing:2px; margin-bottom:8px; }
+.pi { font-size:12px; color:#64748b; line-height:1.7; }
+.threshold-pill { display:inline-block; padding:5px 12px; border-radius:4px; font-size:13px; border:1px solid transparent; margin-bottom:8px; }
+.t-sum { background:#070b10; padding:12px 20px; display:flex; align-items:center; gap:14px; border-top:1px solid #1e293b; }
+
+/* ── THEORY TOOLTIPS ── */
+.theory-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 3px 9px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  position: relative;
+  vertical-align: middle;
+  margin-left: 5px;
+  user-select: none;
+  transition: filter 0.15s;
+}
+.theory-tag:hover { filter: brightness(1.3); }
+.theory-tag::after { content: "?"; font-size:10px; opacity:0.6; }
+
+.theory-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(7,9,15,0.85);
+  backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+}
+.theory-modal.open { display: flex; animation: fadein 0.18s ease; }
+.theory-modal-inner {
+  background: #0d1117;
+  border: 1px solid #1e293b;
+  border-radius: 14px;
+  padding: 32px 36px;
+  max-width: 600px;
+  width: 90%;
+  position: relative;
+}
+.tm-close {
+  position: absolute; top: 16px; right: 20px;
+  font-size: 22px; color: #334155; cursor: pointer;
+  line-height:1;
+}
+.tm-close:hover { color: #94a3b8; }
+.tm-eyebrow { font-size:11px; letter-spacing:3px; margin-bottom:10px; }
+.tm-title { font-size:20px; font-weight:800; margin-bottom:6px; }
+.tm-origin { font-size:12px; color:#475569; margin-bottom:18px; }
+.tm-divider { height:1px; background:#1e293b; margin:14px 0; }
+.tm-section-label { font-size:11px; color:#475569; letter-spacing:2px; margin-bottom:8px; }
+.tm-body { font-size:13px; color:#94a3b8; line-height:1.8; margin-bottom:14px; }
+.tm-application { font-size:13px; color:#64748b; line-height:1.7; }
+.tm-application span { color:#e2e8f0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- Header -->
+<div class="hdr">
+  <div class="hdr-eyebrow">HORMUZ CRISIS · DECISION OS v5.4</div>
+  <div class="hdr-title">总缺口 = T × 净缺口(t)</div>
+  <div class="hdr-sub">物理层决定T与截面缺口 · 博弈层调整T的概率分布 · 点击各项展开</div>
+</div>
+
+<!-- ══════════════════════
+     MASTER FORMULA
+══════════════════════ -->
+<div class="sec-label">核心公式</div>
+<div class="master-formula">
+
+  <div class="mf-cell" onclick="togglePanel('T')" id="mfc-T">
+    <div class="mf-cell-label" style="color:#ef4444;">中断时长 T</div>
+    <div class="mf-cell-value" style="color:#ef4444;">T₁ + T₂</div>
+    <div class="mf-cell-unit" style="color:#ef4444;">Q1 + Q2 决定</div>
+    <div class="mf-cell-hint" id="hint-T">▼ 展开</div>
+  </div>
+
+  <div class="mf-op">×</div>
+
+  <div class="mf-cell" onclick="togglePanel('gap')" id="mfc-gap">
+    <div class="mf-cell-label" style="color:#f97316;">每日净缺口</div>
+    <div class="mf-cell-value" style="color:#f97316;" id="gap-val">16−B(t)</div>
+    <div class="mf-cell-unit" style="color:#f97316;">mbd/天 · 分段变化</div>
+    <div class="mf-cell-hint" id="hint-gap">▼ 展开</div>
+  </div>
+
+  <div class="mf-eq">=</div>
+
+  <div class="mf-result">
+    <div class="mf-cell-label" style="color:#f59e0b;">总缺口（驱动油价）</div>
+    <div class="mf-cell-value" style="color:#fbbf24;font-size:18px;">∫₀ᵀ [16−B(t)] dt</div>
+    <div class="mf-cell-unit" style="color:#f59e0b;">mbd·天 = 累积库存损失</div>
+    <div class="mf-cell-hint" style="color:#f59e0b44;">T越长 × 净缺口越大 → 油价越高</div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════
+     EXPAND PANELS
+══════════════════════ -->
+<div class="expand-row">
+
+  <!-- T panel -->
+  <div class="expand-panel" id="panel-T" style="border-top-color:#ef4444;flex:1.1;">
+    <div style="padding:14px 20px;border-bottom:1px solid #1e293b;background:#0d1117;display:flex;align-items:center;gap:12px;">
+      <span style="background:#ef4444;color:#000;font-size:12px;font-weight:800;padding:3px 9px;border-radius:3px;">Q1</span>
+      <span style="color:#1e3a5f;font-size:20px;font-weight:300;">+</span>
+      <span style="background:#f97316;color:#000;font-size:12px;font-weight:800;padding:3px 9px;border-radius:3px;">Q2</span>
+      <span style="font-size:14px;color:#94a3b8;">→ T = T₁ + T₂（串联，Q1达阈值后Q2才启动）</span>
+    </div>
+    <div class="panel-inner-row">
+      <div class="panel-col">
+        <div class="pl">Q1 → T₁ 主动威胁消除耗时</div>
+        <div class="threshold-pill" style="border-color:#ef444444;color:#ef4444;background:#ef44440a;">⚑ 袭击频率 &lt; 2次/天 → T₁结束</div>
+        <div style="font-size:11px;color:#334155;margin-bottom:12px;">阈值本身无物理推导，是系统已知薄弱点</div>
+        <div class="pl">ACH：T₁长短 <span class="theory-tag" style="color:#f97316;background:#f9731612;border-color:#f9731633;" onclick="openModal('ach')">ACH</span></div>
+        <div class="pi" style="color:#ef4444;">H1 耗竭 → T₁ 较短</div>
+        <div class="pi" style="color:#22c55e;">H2 保留 → T₁ 延长（防御性H2最难区分）</div>
+        <div class="pi" style="color:#475569;">H3 ⏸ 挂起 → +5%平分H1/H2</div>
+        <div class="pl" style="margin-top:10px;">观测信号</div>
+        <div class="pi">· 弹药消费降级比（判别力最高）</div>
+        <div class="pi">· GPS欺骗几何复杂度</div>
+        <div class="pi">· 攻击协调性 多→零散</div>
+        <div class="pi">· 马赛克防御地理碎裂度</div>
+        <div class="pl" style="margin-top:10px;">T₁延长信号</div>
+        <div class="pi" style="color:#f97316;">T1a: GPS↑+频率↑ → 波动率×2</div>
+        <div class="pi">T1b: GPS↑+频率↓ → 仅更新H2权重</div>
+      </div>
+      <div class="panel-col">
+        <div class="pl">Q2 → T₂ 扫雷清除耗时（T₁后启动）</div>
+        <div class="threshold-pill" style="border-color:#f9731644;color:#f97316;background:#f9731608;">⚑ convoyStartMean 中位数 ~5周</div>
+        <div style="font-size:11px;color:#334155;margin-bottom:12px;">注：T₁→T₂之间存在1–2周部署缺口（系统已知盲区）</div>
+        <div class="pl">T₂分布不确定性</div>
+        <div class="pi">· 水中水雷 U[20,100]枚</div>
+        <div class="pi">· 20枚 vs 100枚 → T₂差 2–3周</div>
+        <div class="pi">· 水雷类型混合（声学雷最慢）</div>
+        <div class="pl" style="margin-top:10px;">T₂延长信号</div>
+        <div class="pi" style="color:#f97316;">E3 触雷 → T₂ +1周</div>
+        <div class="pi" style="color:#ef4444;">C2 已扫区再雷 → T₂ +3周</div>
+        <div class="pi" style="color:#ef4444;">E2 IRGC攻扫雷舰 → T₂ +2周</div>
+        <div class="pl" style="margin-top:10px;">T₂完成信号（T结束的退出触发）</div>
+        <div class="pi" style="color:#22c55e;">通航量连续↑3天（领先）</div>
+        <div class="pi" style="color:#22c55e;">AP &lt; 1%（滞后确认，1–2周后）</div>
+      </div>
+    </div>
+    <div class="t-sum">
+      <div style="font-size:11px;color:#475569;letter-spacing:2px;">T路径估算</div>
+      <div style="display:flex;gap:18px;font-size:13px;">
+        <span style="color:#22c55e;">A: ~3–4周</span>
+        <span style="color:#f59e0b;">B: ~6w + ~5w = ~11–12周</span>
+        <span style="color:#ef4444;">C: &gt;6个月（不收敛）</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gap panel -->
+  <div class="expand-panel" id="panel-gap" style="border-top-color:#f97316;flex:1;">
+    <div style="padding:12px 18px;border-bottom:1px solid #1e293b;background:#0d1117;">
+      <div style="font-size:15px;color:#f97316;">净缺口(t) = 毛缺口 − Buffer(t)&nbsp;&nbsp;<span style="color:#475569;font-size:13px;">分段计算，非恒定</span></div>
+    </div>
+    <div class="panel-col" style="padding:14px 16px;">
+      <div class="pl">毛缺口（T期间近似恒定）</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">
+        <span style="font-size:15px;color:#64748b;">20.1</span>
+        <span style="color:#334155;">×</span>
+        <span class="pulse" style="font-size:20px;font-weight:700;">~80%</span>
+        <span style="color:#334155;">=</span>
+        <span style="font-size:28px;font-weight:800;color:#f97316;">~16 mbd</span>
+      </div>
+      <div style="font-size:12px;color:#334155;margin-bottom:16px;">
+        历史锚：1984袭船战~70% | 2026-03峰值~92% → 稳态取80%<br>
+        T结束时阶跃回落至&lt;10%（非渐变）
+      </div>
+
+      <div class="pl">Buffer(t) — Q3驱动，分段爬坡（影响净缺口）</div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:#475569;width:48px;">D1–14</span>
+          <div style="flex:1;background:#0a0e1a;border-radius:3px;height:26px;position:relative;overflow:hidden;">
+            <div style="position:absolute;left:0;top:0;height:100%;width:20%;background:#22c55e44;"></div>
+            <span style="position:absolute;inset:0;display:flex;align-items:center;padding:0 8px;font-size:12px;color:#22c55e;">~1.5 mbd → 净缺口 ~14.5 mbd</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:#475569;width:48px;">D14+</span>
+          <div style="flex:1;background:#0a0e1a;border-radius:3px;height:26px;position:relative;overflow:hidden;">
+            <div style="position:absolute;left:0;top:0;height:100%;width:68%;background:#22c55e66;"></div>
+            <span style="position:absolute;inset:0;display:flex;align-items:center;padding:0 8px;font-size:12px;color:#4ade80;">~7 mbd → 净缺口 ~9 mbd</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pl">路径C脆弱性</div>
+      <div class="pi" style="color:#ef4444;">富查伊拉遇袭 → Buffer骤降至~2 mbd → 净缺口扩至~14 mbd</div>
+      <div class="pi" style="color:#f97316;">延布港卡在2.2 mbd → pipelineMax下调</div>
+    </div>
+  </div>
+
+</div><!-- expand-row -->
+
+<!-- ══════════════════════════════════
+     SCHELLING 博弈层
+     （调整T的概率分布，不直接生成缺口）
+══════════════════════════════════ -->
+<div class="connector">
+  <div class="conn-line" style="height:16px;background:linear-gradient(#1e293b,#8b5cf688);"></div>
+  <div class="conn-head" style="border-top:6px solid #8b5cf6;"></div>
+  <div class="conn-label" style="color:#8b5cf6;">博弈层：影响T → 调整路径A/B/C概率权重</div>
+</div>
+
+<div class="schelling-bar">
+  <div class="sb-header" id="sb-hdr" onclick="toggleSchelling()">
+    <span class="sb-badge">博弈层</span>
+    <span class="sb-title">Schelling Signal Sheet · 路径概率调节器</span>
+    <span class="sb-role">只影响T → 改变路径A/B/C权重 · 不直接驱动Buffer</span>
+    <span class="sb-chev" id="sb-chev">▼</span>
+  </div>
+  <div class="sb-body" id="sb-body">
+
+    <!-- Three Diagnostics -->
+    <div style="font-size:11px;color:#475569;letter-spacing:2px;margin-bottom:12px;">SCHELLING三诊断 · 决定博弈结构</div>
+    <div class="diag-row">
+      <div class="diag-card" style="border-top-color:#22c55e;">
+        <div class="dc-name" style="color:#22c55e;">承诺锁定松动？ <span class="theory-tag" style="color:#22c55e;background:#22c55e12;border-color:#22c55e33;" onclick="openModal('commitment')">承诺锁定</span></div>
+        <div class="dc-question">任何一方信号包出现内部不一致</div>
+        <div class="dc-signal" style="color:#64748b;">美方：打击继续但优先级转向护航<br>伊方：IRGC与政治层表态分裂</div>
+        <div class="dc-effect" style="background:#22c55e12;color:#22c55e;">→ T缩短预期 · 路径A ↑</div>
+      </div>
+      <div class="diag-card" style="border-top-color:#ef4444;">
+        <div class="dc-name" style="color:#ef4444;">失控风险上升？ <span class="theory-tag" style="color:#ef4444;background:#ef444412;border-color:#ef444433;" onclick="openModal('escalation')">边缘策略</span></div>
+        <div class="dc-question">分散化指挥放大"留给机会"的失控成分</div>
+        <div class="dc-signal" style="color:#64748b;">IRGC目标溢出航运<br>误击事件·指挥链失控信号</div>
+        <div class="dc-effect" style="background:#ef444412;color:#ef4444;">→ T延长预期 · 路径C ↑↑</div>
+      </div>
+      <div class="diag-card" style="border-top-color:#3b82f6;">
+        <div class="dc-name" style="color:#3b82f6;">外部聚点注入？ <span class="theory-tag" style="color:#3b82f6;background:#3b82f612;border-color:#3b82f633;" onclick="openModal('focal')">焦点理论</span></div>
+        <div class="dc-question">第三方提供可协调的停火焦点</div>
+        <div class="dc-signal" style="color:#64748b;">调停框架出现<br>护航安排介入·多边谈判</div>
+        <div class="dc-effect" style="background:#3b82f612;color:#3b82f6;">→ T快速收敛 · 路径A ↑↑</div>
+      </div>
+    </div>
+
+    <!-- Signal table -->
+    <div style="font-size:11px;color:#475569;letter-spacing:2px;margin-bottom:10px;">硬可观测信号 → 路径概率调整（仓位由路径权重间接反映）</div>
+    <table class="signal-table">
+      <tr>
+        <th style="width:42%;">信号</th>
+        <th style="width:24%;">诊断</th>
+        <th>路径概率 Δ</th>
+      </tr>
+      <tr>
+        <td style="color:#94a3b8;">外部协调者下场（调停框架）</td>
+        <td style="color:#3b82f6;">聚点注入</td>
+        <td><span class="sig-dir" style="color:#22c55e;">A↑↑ · C↓</span></td>
+      </tr>
+      <tr>
+        <td style="color:#94a3b8;">美方部署扫雷优先令 / SPR实质释放</td>
+        <td style="color:#22c55e;">高成本绑定</td>
+        <td><span class="sig-dir" style="color:#22c55e;">A↑ · B→A迁移</span></td>
+      </tr>
+      <tr>
+        <td style="color:#94a3b8;">IRGC攻击扫雷舰（E2）</td>
+        <td style="color:#ef4444;">边缘失控</td>
+        <td><span class="sig-dir" style="color:#ef4444;">B↑ · C↑</span></td>
+      </tr>
+      <tr>
+        <td style="color:#94a3b8;">IRGC目标溢出至区域能源网（E1）</td>
+        <td style="color:#ef4444;">失控实现</td>
+        <td><span class="sig-dir" style="color:#ef4444;">C↑↑ · A↓</span></td>
+      </tr>
+      <tr>
+        <td style="color:#94a3b8;">美方信号包不一致（打击≠目标）</td>
+        <td style="color:#22c55e;">承诺松动</td>
+        <td><span class="sig-dir" style="color:#22c55e;">A↑ · B→A迁移</span></td>
+      </tr>
+    </table>
+
+    <div style="margin-top:14px;background:#070b10;border-radius:6px;padding:10px 14px;font-size:12px;color:#475569;line-height:1.8;">
+      <span style="color:#8b5cf6;">博弈层边界：</span>
+      Schelling信号只影响 <span style="color:#ef4444;">T</span>——政治干预改变冲突持续时长，进而改变落在哪条路径的概率。<span style="color:#22c55e;">Buffer(t)</span> 是独立的物理过程（Q3驱动），博弈层不直接驱动它。路径C中Buffer崩溃（如富查伊拉遇袭）是物理事件，与博弈失控<span style="color:#94a3b8;">相关但因果独立</span>——失控提高两者同时发生的条件概率，并非直接因果链。物理时间常数仍设定T的硬下界，政治决策无法突破。
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════
+     CONNECTOR → RESULT
+══════════════════════ -->
+<div class="connector" style="margin:6px 0;">
+  <div class="conn-line" style="height:18px;background:linear-gradient(#8b5cf688,#f59e0b88);"></div>
+  <div class="conn-head" style="border-top:6px solid #f59e0b;"></div>
+  <div class="conn-label" style="color:#f59e0b;">物理层确定T范围 · 博弈层调整路径权重 → 总缺口</div>
+</div>
+
+<!-- ══════════════════════
+     RESULT: THREE PATHS
+══════════════════════ -->
+<div class="sec-label">总缺口 · 分段计算（修正版）</div>
+<div class="result-box">
+  <div class="rb-label">总缺口 = ∫₀ᵀ [16 − Buffer(t)] dt &nbsp;[mbd·天]</div>
+  <div class="rb-formula">分段：D1–14 净缺口~14.5 mbd · D14–T 净缺口~9 mbd</div>
+  <div class="rb-note">注：旧版用平均净缺口×T，忽略缓冲爬坡导致数字偏低，已修正</div>
+
+  <div class="rb-grid">
+
+    <!-- A -->
+    <div class="rb-col" style="border-top-color:#22c55e;">
+      <div><span class="prob-badge" style="background:#22c55e22;color:#22c55e;">路径A · 30%</span></div>
+      <div class="calc-row">
+        <div class="calc-line"><span class="dim">T</span><span class="val">~3–4周</span></div>
+        <div class="calc-line"><span class="dim">D1–14 段</span><span class="val">14 × 14.5 = 203</span></div>
+        <div class="calc-line"><span class="dim">D14–28 段</span><span class="val">14 × ~5 mbd = 70</span></div>
+        <div class="calc-divider"></div>
+        <div class="calc-total"><span style="color:#64748b;">总缺口</span><span style="color:#22c55e;">~270 mbd·天</span></div>
+      </div>
+      <div class="rbc-note">净缺口在第3–4周因外交聚点快速收敛，总缺口相对有限。库存无断裂。</div>
+    </div>
+
+    <!-- B -->
+    <div class="rb-col" style="border-top-color:#f59e0b;">
+      <div><span class="prob-badge" style="background:#f59e0b22;color:#f59e0b;">路径B · 50%</span></div>
+      <div class="calc-row">
+        <div class="calc-line"><span class="dim">T</span><span class="val">~84天（12周）</span></div>
+        <div class="calc-line"><span class="dim">D1–14 段</span><span class="val">14 × 14.5 = 203</span></div>
+        <div class="calc-line"><span class="dim">D14–84 段</span><span class="val">70 × 9 = 630</span></div>
+        <div class="calc-divider"></div>
+        <div class="calc-total"><span style="color:#64748b;">总缺口</span><span style="color:#f59e0b;">~833 mbd·天</span></div>
+      </div>
+      <div class="rbc-note">≈ 全球商业库存的~28%被抽干。近远月极度深贴水，结构性短缺。</div>
+    </div>
+
+    <!-- C -->
+    <div class="rb-col" style="border-top-color:#ef4444;">
+      <div><span class="prob-badge" style="background:#ef444422;color:#ef4444;">路径C · 20%</span></div>
+      <div class="calc-row">
+        <div class="calc-line"><span class="dim">T</span><span class="val">&gt;180天</span></div>
+        <div class="calc-line"><span class="dim">D1–14 段</span><span class="val">14 × 14.5 = 203</span></div>
+        <div class="calc-line"><span class="dim">D14+ 段</span><span class="val">166 × 14 = 2324</span></div>
+        <div style="font-size:11px;color:#ef4444;margin:3px 0;">（Buffer骤降至~2 mbd）</div>
+        <div class="calc-divider"></div>
+        <div class="calc-total"><span style="color:#64748b;">总缺口</span><span style="color:#ef4444;">&gt;2500 mbd·天</span></div>
+      </div>
+      <div class="rbc-note">Buffer(t)因富查伊拉遇袭骤降，净缺口扩至~14 mbd。总缺口触发全球需求硬破坏。</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- connector to positions -->
+<div class="connector" style="margin:6px 0;">
+  <div class="conn-line" style="height:16px;background:linear-gradient(#f59e0b66,#6366f1);"></div>
+  <div class="conn-head" style="border-top:6px solid #6366f1;"></div>
+  <div class="conn-label" style="color:#6366f1;">总缺口预期 → 仓位配置</div>
+</div>
+
+<!-- ══════════════════════
+     POSITIONS
+══════════════════════ -->
+<div class="pos-grid" style="margin-bottom:16px;">
+  <div class="pos-card" style="border-color:#f9731633;background:#f9731608;">
+    <div class="pos-size" style="color:#f97316;">15%</div>
+    <div class="pos-name">能源多头</div>
+    <div class="pos-inst">布伦特 / USO / XLE</div>
+    <div class="pos-note">三路径均产生正总缺口</div>
+  </div>
+  <div class="pos-card" style="border-color:#a855f733;background:#a855f708;">
+    <div class="pos-size" style="color:#a855f7;">3%</div>
+    <div class="pos-name">波动率多头</div>
+    <div class="pos-inst">OVX call / straddle</div>
+    <div class="pos-note">T不确定性 + 失控风险</div>
+  </div>
+  <div class="pos-card" style="border-color:#3b82f633;background:#3b82f608;">
+    <div class="pos-size" style="color:#3b82f6;">2%</div>
+    <div class="pos-name">衰退对冲</div>
+    <div class="pos-inst">TLT / 短周期 Put</div>
+    <div class="pos-note">路径C总缺口→需求破坏</div>
+  </div>
+</div>
+
+<!-- ══════════════════════
+     EXIT RULES
+══════════════════════ -->
+<div class="exit-box">
+  <div class="exit-hdr">止损 · 退出规则</div>
+  <div class="exit-row">
+    <span class="exit-icon" style="color:#22c55e;">✓</span>
+    <div>
+      <div class="exit-trigger">触发: <span style="color:#22c55e;">通航量连续↑3天（领先）+ AP &lt; 1%（滞后确认）</span></div>
+      <div style="font-size:11px;color:#334155;margin:3px 0 4px;">→ T结束，总缺口停止累积。注意：领先指标先动，AP滞后1–2周</div>
+      <div class="exit-action">平波动率多头，能源阶梯减仓</div>
+    </div>
+  </div>
+  <div class="exit-row">
+    <span class="exit-icon" style="color:#f97316;">⚡</span>
+    <div>
+      <div class="exit-trigger">触发: <span style="color:#f97316;">布伦特 &gt; $150</span> <span style="color:#334155;font-size:11px;">路径C终局</span></div>
+      <div style="font-size:11px;color:#334155;margin:3px 0 4px;">→ 总缺口已引爆需求强制破坏，净缺口逻辑失效</div>
+      <div class="exit-action">清能源多头，衰退对冲×2，切换"宏观衰退"逻辑</div>
+    </div>
+  </div>
+  <div class="exit-row">
+    <span class="exit-icon" style="color:#ef4444;">⛔</span>
+    <div>
+      <div class="exit-trigger">触发: <span style="color:#ef4444;">布伦特 &lt; $80 连续3天</span> <span style="color:#334155;font-size:11px;">系统失效</span></div>
+      <div style="font-size:11px;color:#334155;margin:3px 0 4px;">→ 与总缺口现实构成逻辑悖论，系统失效或独立宏观崩盘</div>
+      <div class="exit-action">强制平所有能源超配，无视中东物理模型</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end pos-exit-section -->
+
+<div class="footer">PHYSICAL › INSTITUTIONAL › GAME-THEORETIC · v5.4 · 2026-03-12</div>
+</div>
+
+<script>
+const panelStates = { T: false, gap: false };
+
+function togglePanel(key) {
+  panelStates[key] = !panelStates[key];
+  document.getElementById('panel-' + key).classList.toggle('open', panelStates[key]);
+  document.getElementById('hint-' + key).textContent = panelStates[key] ? '▲ 收起' : '▼ 展开';
+  document.getElementById('mfc-' + key).style.outline = panelStates[key] ? '1px solid rgba(255,255,255,0.07)' : 'none';
+}
+
+function toggleSchelling() {
+  const body = document.getElementById('sb-body');
+  const hdr = document.getElementById('sb-hdr');
+  const chev = document.getElementById('sb-chev');
+  const open = body.classList.contains('open');
+  body.classList.toggle('open', !open);
+  hdr.classList.toggle('open', !open);
+  chev.textContent = open ? '▼' : '▲';
+}
+</script>
+
+<!-- ══════════════════════
+     THEORY MODALS
+══════════════════════ -->
+
+<!-- ACH Modal -->
+<div class="theory-modal" id="modal-ach" onclick="closeModal('ach')">
+  <div class="theory-modal-inner" onclick="event.stopPropagation()">
+    <div class="tm-close" onclick="closeModal('ach')">×</div>
+    <div class="tm-eyebrow" style="color:#f97316;">分析方法论</div>
+    <div class="tm-title" style="color:#f97316;">ACH · 竞争性假设分析</div>
+    <div class="tm-origin">Analysis of Competing Hypotheses · Richards Heuer, CIA 1999</div>
+    <div class="tm-divider"></div>
+    <div class="tm-section-label">核心逻辑</div>
+    <div class="tm-body">
+      传统分析容易陷入"确认偏误"——先有结论再找证据。ACH反转这个过程：先列出所有可能假设，再用每条证据逐一检验哪个假设与之最不相容。最终留下的不是"最多证据支持"的假设，而是"最少证据反驳"的假设。
+    </div>
+    <div class="tm-section-label">在本框架的应用</div>
+    <div class="tm-application">
+      Q1设置三个互斥假设：<span>H1耗竭</span>（封闭衰减）、<span>H2保留</span>（策略配给）、<span>H3补给</span>（已挂起）。每条观测信号（弹药降级比、GPS欺骗复杂度等）对H1/H2的预测方向不同，通过持续更新后验概率判断IRGC真实状态，避免单一信号误导T₁时长判断。
+    </div>
+  </div>
+</div>
+
+<!-- 承诺锁定 Modal -->
+<div class="theory-modal" id="modal-commitment" onclick="closeModal('commitment')">
+  <div class="theory-modal-inner" onclick="event.stopPropagation()">
+    <div class="tm-close" onclick="closeModal('commitment')">×</div>
+    <div class="tm-eyebrow" style="color:#22c55e;">博弈论</div>
+    <div class="tm-title" style="color:#22c55e;">承诺锁定 · Commitment</div>
+    <div class="tm-origin">Thomas Schelling · The Strategy of Conflict, 1960</div>
+    <div class="tm-divider"></div>
+    <div class="tm-section-label">核心逻辑</div>
+    <div class="tm-body">
+      承诺机制（Commitment Device）的核心：通过<span>削弱自身回撤和妥协的能力</span>来增强威胁的可信度。承诺机制增强威胁可信度的同时，显著压缩降级空间。当双方都锁定承诺后，博弈出口收窄为：一方承受能力先崩溃，或局势在更高风险水平上被迫重新评估。
+    </div>
+    <div class="tm-section-label">在本框架的应用</div>
+    <div class="tm-application">
+      <span>IRGC 侧</span>：去中心化指挥结构构成典型承诺机制。即便莫杰塔巴本人有意推动降级，也未必具备将意图稳定传导至整个执行体系的能力——组织结构已大幅压缩了"停下来"的实际操作空间。<br><br>
+      <span>美方侧</span>：Trump 的"unconditional surrender"表述具有类似性质。通过公开宣称不存在妥协空间，主动缩小了未来回旋和谈判的余地，任何后续让步都将面临极高的政治成本。<br><br>
+      <span>持久性约束</span>：承诺机制的持久性取决于物理约束。IRGC 声称六个月弹药，但有战略性夸大的强烈动机。首轮打击已摧毁部分海军和指挥设施，实际持续封锁能力可能在 2–8 周后显著衰减——<span>承诺机制如果失去物理支撑，就会自动解锁</span>。<br><br>
+      <span>框架信号</span>：当美方信号包出现内部不一致（打击继续但优先级实质转向护航），说明承诺锁定正在松动——T缩短的早期信号，路径A概率上升。反之，若美方部署扫雷优先令或实质释放SPR，则为高成本自我绑定，承诺锁定加强。
+    </div>
+  </div>
+</div>
+
+<!-- 失控风险 Modal -->
+<div class="theory-modal" id="modal-escalation" onclick="closeModal('escalation')">
+  <div class="theory-modal-inner" onclick="event.stopPropagation()">
+    <div class="tm-close" onclick="closeModal('escalation')">×</div>
+    <div class="tm-eyebrow" style="color:#ef4444;">博弈论</div>
+    <div class="tm-title" style="color:#ef4444;">边缘策略 · Brinkmanship</div>
+    <div class="tm-origin">Thomas Schelling · Arms and Influence, 1966</div>
+    <div class="tm-divider"></div>
+    <div class="tm-section-label">核心逻辑</div>
+    <div class="tm-body">
+      "留给机会的威胁"——真正施加压力的，不只是明确的升级意图，而是<span>"系统内部某些行为体可能做出连中央都难以约束的行动"</span>。边缘策略的危险不在于任何一方主动选择升级，而在于制造了一种失控概率不可忽略的环境，迫使对手在升级发生前让步。
+    </div>
+    <div class="tm-section-label">在本框架的应用</div>
+    <div class="tm-application">
+      <span>分散化放大"机会"</span>：IRGC 执行链条的分散化放大了"留给机会"的成分。地方指挥官可能自行扩大攻击目标，德黑兰未必能可信地保证升级不会发生。这使得封锁行动本身成为一种持续的边缘策略——即使最高层无意升级，系统结构使升级概率始终非零。<br><br>
+      <span>分散化的双重性</span>：同样的去中心化结构也意味着 IRGC 各省级单位可能在弹药和物资耗尽后<span>各自寻求地方性停火</span>，而非保持统一对抗。分散化既是承诺的强化，也是碎片化的前兆——两种演化在当前证据下都合理。<br><br>
+      <span>关键信号</span>：IRGC 攻击扫雷舰（E2）和目标溢出至区域能源网（E1）是边缘策略向失控转化的两个关键信号。E2 说明指挥层对局部单位控制力下降；E1 说明攻击边界已突破战术目标，进入战略升级领域。两者均触发路径C概率上升。
+    </div>
+  </div>
+</div>
+
+<!-- 焦点理论 Modal -->
+<div class="theory-modal" id="modal-focal" onclick="closeModal('focal')">
+  <div class="theory-modal-inner" onclick="event.stopPropagation()">
+    <div class="tm-close" onclick="closeModal('focal')">×</div>
+    <div class="tm-eyebrow" style="color:#3b82f6;">博弈论</div>
+    <div class="tm-title" style="color:#3b82f6;">焦点理论 · Focal Point</div>
+    <div class="tm-origin">Thomas Schelling · The Strategy of Conflict, 1960</div>
+    <div class="tm-divider"></div>
+    <div class="tm-section-label">核心逻辑</div>
+    <div class="tm-body">
+      聚点成立的前提是博弈双方至少<span>共享某种基本认知框架</span>。在无法直接沟通的博弈中，博弈方会自发聚焦于某个"显眼"的解决方案——不是因为它在逻辑上最优，而是因为它在文化、历史或结构上最突出。焦点的力量来自共同知识：我知道你知道我知道这个点的存在。但当双方缺乏共享框架时，聚点极难内生形成。
+    </div>
+    <div class="tm-section-label">在本框架的应用</div>
+    <div class="tm-application">
+      <span>三重障碍</span>：当前局势中聚点形成面临三个结构性障碍——双方无共享的"到此为止"定义；对手不统一（IRGC 内部碎片化）；缺乏共享战略文化。这使得内生聚点极难形成。<br><br>
+      <span>但聚点不一定需要内生产生。</span>以下三条外部注入路径值得关注：<br><br>
+      <span>路径 A：中国调停创造聚点（20–30%）</span><br>
+      中国是霍尔木兹最大利益相关方（84% 流量流向亚洲）。有能力对伊朗施加经济压力，也能提供面子台阶（"维护发展中国家能源安全"叙事）。可能结构：中国担保的有限通行安排——IRGC 允许中国船队护航通过，美国默许——逐步扩展为更广泛的受保护通行。约束：中国可能不愿承担调停失败的声誉风险。<br><br>
+      <span>路径 B：联合国安理会框架（10–15%）</span><br>
+      安理会决议设定时限（如 72 小时停火供人道通行）可创造外部协调点。即使决议被否决，议题本身可为双方提供"考虑时间"。约束：美国可能否决不包含伊朗投降条件的决议。<br><br>
+      <span>路径 C：有限通行换局部停火（25–35%）</span><br>
+      非正式安排：IRGC 停止攻击中立国船只，换取美方暂停对伊朗本土特定目标的打击。不需要任何一方"承认失败"，只需双方都能解读为"战术调整"。在 IRGC 弹药紧张、美国中期选举压力上升后，可行性上升。<br><br>
+      <span>博弈结论</span>：当前局势处于<span>"双重承诺锁定"</span>状态——谢林框架中的高危构型。聚点并非完全缺失，而是需要外部注入且启动条件苛刻。退出路径存在，但需要催化剂，且执行过程可能反复和不稳定。
+    </div>
+  </div>
+</div>
+
+<script>
+function openModal(id) {
+  document.getElementById('modal-' + id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  document.getElementById('modal-' + id).classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    ['ach','commitment','escalation','focal'].forEach(closeModal);
+  }
+});
+</script>
+</body>
+</html>

@@ -23,11 +23,12 @@ from hormuz.reporter import Reporter
 def reporter(tmp_db, tmp_path) -> Reporter:
     db = HormuzDB(tmp_db)
     template_dir = Path(__file__).parent.parent / "templates"
+    config_dir = Path(__file__).parent.parent / "configs"
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     reports_dir = tmp_path / "reports"
     reports_dir.mkdir()
-    return Reporter(db, template_dir, output_dir, reports_dir)
+    return Reporter(db, template_dir, output_dir, reports_dir, config_dir=config_dir)
 
 
 def _seed_basic(db: HormuzDB) -> None:
@@ -42,7 +43,7 @@ def _seed_basic(db: HormuzDB) -> None:
     db.insert_mc_params(MCParams(
         timestamp=now,
         irgc_decay_mean=6.0, convoy_start_mean=5.0,
-        disruption_range=(0.55, 0.90), pipeline_max=4.0,
+        pipeline_max=4.0,
         pipeline_ramp_weeks=2.5, spr_rate_mean=2.5,
         spr_delay_weeks=2.5, surplus_buffer=2.5,
         path_weights=PathWeights(a=0.3, b=0.5, c=0.2),
@@ -59,12 +60,11 @@ class TestStatusReport:
         _seed_basic(reporter.db)
         path = reporter.update_status()
         content = path.read_text()
-        # Check all 5 panels present (Chinese labels)
-        assert "状态总览" in content
-        assert "物理层" in content
-        assert "观测层" in content
-        assert "博弈层" in content
-        assert "仓位" in content
+        assert "ABC 路径权重" in content
+        assert "ACH 制度" in content
+        assert "物理参数" in content
+        assert "Grabo 绊线" in content
+        assert "近期观测" in content
 
     def test_shows_path_weights(self, reporter):
         _seed_basic(reporter.db)
@@ -80,12 +80,12 @@ class TestStatusReport:
         content = path.read_text()
         assert "wide" in content.lower()
 
-    def test_shows_mc_params(self, reporter):
+    def test_shows_phys_params(self, reporter):
         _seed_basic(reporter.db)
         path = reporter.update_status()
         content = path.read_text()
-        assert "6.0" in content  # irgc_decay_mean
-        assert "5.0" in content  # convoy_start_mean
+        assert "IRGC 衰减均值" in content
+        assert "护航启动均值" in content
 
     def test_shows_signal_status(self, reporter):
         reporter.db.insert_signal(Signal(
@@ -96,24 +96,13 @@ class TestStatusReport:
         content = path.read_text()
         assert "E3" in content
 
-    def test_shows_mc_result(self, reporter):
+    def test_shows_path_descriptions(self, reporter):
         _seed_basic(reporter.db)
-        reporter.db.insert_mc_result(MCResult(
-            timestamp=datetime.now(UTC), params_id=1,
-            price_mean=92.5, price_p10=78.0, price_p50=90.0,
-            price_p90=115.0, path_a_price=75.0,
-            path_b_price=95.0, path_c_price=130.0))
         path = reporter.update_status()
         content = path.read_text()
-        assert "92.5" in content
-
-    def test_shows_unexecuted_positions(self, reporter):
-        reporter.db.insert_position_signal(PositionSignal(
-            timestamp=datetime.now(UTC),
-            trigger="E3", action="加仓 CL 5%", executed=False))
-        path = reporter.update_status()
-        content = path.read_text()
-        assert "加仓 CL 5%" in content
+        assert "快速解决" in content
+        assert "拉锯消耗" in content
+        assert "升级扩大" in content
 
     def test_shows_observations(self, reporter):
         reporter.db.insert_observation(Observation(
@@ -128,7 +117,7 @@ class TestStatusReport:
         path = reporter.update_status()
         content = path.read_text()
         assert "<!DOCTYPE html>" in content
-        assert "状态总览" in content
+        assert "ABC 路径权重" in content
 
 
 class TestWeeklyArchive:
@@ -173,14 +162,12 @@ class TestGatherData:
         assert isinstance(data, dict)
         assert "q1_regime" in data
         assert "q2_regime" in data
-        assert "mc_params" in data
+        assert "phys_params" in data
         assert "signals" in data
-        assert "positions" in data
 
     def test_gather_with_data(self, reporter):
         _seed_basic(reporter.db)
         data = reporter._gather_status_data()
-        assert data["mc_params"] is not None
         assert data["q1_regime"] is not None
         assert data["path_weights"] is not None
 

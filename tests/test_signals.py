@@ -106,19 +106,37 @@ class TestTripwireDetection:
         assert triggered[0].signal_id == "C2"
         assert triggered[0].revert_deadline is None
 
-    def test_t1_platform_movement(self, signal_engine: SignalEngine):
-        """Missile platform movement -> T1 triggered with 48h revert."""
-        obs = _obs(category="q1_attack", key="t1_platform_movement")
+    def test_t1a_gps_spoofing_offensive(self, signal_engine: SignalEngine):
+        """v5.4: GPS spoofing + rising attack freq -> T1a (offensive H2)."""
+        obs = _obs(
+            category="q1_attack",
+            key="gps_spoofing_cluster",
+            metadata={"attack_freq_trend": "rising"},
+        )
         triggered = signal_engine.scan([obs])
 
         assert len(triggered) == 1
         sig = triggered[0]
-        assert sig.signal_id == "T1"
+        assert sig.signal_id == "T1a"
         assert sig.status == SignalStatus.triggered
         assert sig.revert_deadline is not None
-        # Revert deadline should be ~48h after trigger
         delta = sig.revert_deadline - sig.timestamp
         assert abs(delta.total_seconds() - 48 * 3600) < 1
+
+    def test_t1b_gps_spoofing_defensive(self, signal_engine: SignalEngine):
+        """v5.4: GPS spoofing + declining attack freq -> T1b (defensive H2)."""
+        obs = _obs(
+            category="q1_attack",
+            key="gps_spoofing_cluster",
+            metadata={"attack_freq_trend": "declining"},
+        )
+        triggered = signal_engine.scan([obs])
+
+        assert len(triggered) == 1
+        sig = triggered[0]
+        assert sig.signal_id == "T1b"
+        assert sig.status == SignalStatus.triggered
+        assert sig.revert_deadline is not None
 
     def test_t2_coastal_positions(self, signal_engine: SignalEngine):
         """Multi-region coastal positions -> T2 triggered."""
@@ -173,7 +191,11 @@ class TestTripwireDetection:
 class TestRevert:
     def test_tripwire_reverts_after_48h(self, signal_engine: SignalEngine):
         """T-class reverts after 48h with no confirmation."""
-        obs = _obs(category="q1_attack", key="t1_platform_movement")
+        obs = _obs(
+            category="q1_attack",
+            key="gps_spoofing_cluster",
+            metadata={"attack_freq_trend": "rising"},
+        )
         signal_engine.scan([obs])
 
         # Before 48h: no reverts
@@ -185,7 +207,7 @@ class TestRevert:
         now_after = datetime(2026, 3, 10, 12, 0, tzinfo=UTC) + timedelta(hours=49)
         reverted = signal_engine.check_reverts(now_after)
         assert len(reverted) == 1
-        assert reverted[0].signal_id == "T1"
+        assert reverted[0].signal_id == "T1a"
         assert reverted[0].status == SignalStatus.reverted
 
     def test_event_trigger_never_reverts(self, signal_engine: SignalEngine):
@@ -236,14 +258,19 @@ class TestPositionSignalGeneration:
         assert "波动率" in ps.action or "vol" in ps.action.lower()
         assert ps.executed is False
 
-    def test_t1_generates_position_signal(self, signal_engine: SignalEngine):
-        """T1 tripwire -> position signal for vol doubling."""
-        obs = _obs(category="q1_attack", key="t1_platform_movement")
+    def test_t1a_generates_position_signal(self, signal_engine: SignalEngine):
+        """v5.4: T1a tripwire -> position signal for vol doubling."""
+        obs = _obs(
+            category="q1_attack",
+            key="gps_spoofing_cluster",
+            metadata={"attack_freq_trend": "rising"},
+        )
         signal_engine.scan([obs])
 
         pos_signals = signal_engine.db.get_unexecuted_position_signals()
         assert len(pos_signals) == 1
         assert pos_signals[0].executed is False
+        assert "波动率" in pos_signals[0].action
 
     def test_c1_generates_position_signal(self, signal_engine: SignalEngine):
         """C1 confirmation -> position signal for ACH->H3."""

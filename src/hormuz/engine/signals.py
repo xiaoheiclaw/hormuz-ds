@@ -35,8 +35,24 @@ class SignalDef:
 
 # --- Detection functions ---
 
-def _detect_t1(obs: Observation) -> bool:
-    return obs.category == "q1_attack" and obs.key == "t1_platform_movement"
+def _detect_t1a(obs: Observation) -> bool:
+    """v5.4: GPS spoofing cluster + attack frequency rising = offensive H2."""
+    return (
+        obs.category == "q1_attack"
+        and obs.key == "gps_spoofing_cluster"
+        and obs.metadata is not None
+        and obs.metadata.get("attack_freq_trend") == "rising"
+    )
+
+
+def _detect_t1b(obs: Observation) -> bool:
+    """v5.4: GPS spoofing cluster + attack frequency declining = defensive H2."""
+    return (
+        obs.category == "q1_attack"
+        and obs.key == "gps_spoofing_cluster"
+        and obs.metadata is not None
+        and obs.metadata.get("attack_freq_trend") == "declining"
+    )
 
 
 def _detect_t2(obs: Observation) -> bool:
@@ -93,8 +109,9 @@ SIGNAL_DEFS: list[SignalDef] = [
     SignalDef("E2", _detect_e2, "convoyStartMean上调2周", has_revert=False),
     SignalDef("E3", _detect_e3, "convoyStartMean上调1周", has_revert=False),
     SignalDef("E4", _detect_e4, "Q2时间线延长", has_revert=False),
-    # Tripwires (48h auto-revert)
-    SignalDef("T1", _detect_t1, "波动率头寸加倍", has_revert=True),
+    # Tripwires (48h auto-revert) — v5.4: T1 split into T1a/T1b
+    SignalDef("T1a", _detect_t1a, "波动率头寸立即加倍（攻击性H2确认）", has_revert=True),
+    SignalDef("T1b", _detect_t1b, "仅上调H2权重，维持波动率不变（防御性H2确认）", has_revert=True),
     SignalDef("T2", _detect_t2, "路径C权重大幅上调", has_revert=True),
     SignalDef("T3", _detect_t3, "convoyStartMean上调2周", has_revert=True),
 ]

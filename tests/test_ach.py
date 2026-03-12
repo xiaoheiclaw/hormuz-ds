@@ -10,8 +10,16 @@ from hormuz.models import ACHEvidence, RegimeType
 
 @pytest.fixture
 def ach_engine(tmp_db, constants) -> ACHEngine:
+    """Default: h3_suspended=True (v5.4)."""
     db = HormuzDB(tmp_db)
-    return ACHEngine(db, constants["ach"])
+    return ACHEngine(db, constants["ach"], h3_suspended=True)
+
+
+@pytest.fixture
+def ach_engine_h3_active(tmp_db, constants) -> ACHEngine:
+    """H3 active (pre-v5.4 or if supply line restored)."""
+    db = HormuzDB(tmp_db)
+    return ACHEngine(db, constants["ach"], h3_suspended=False)
 
 
 def _ev(question: str, evidence_id: int, direction: str, ts: datetime | None = None) -> ACHEvidence:
@@ -41,44 +49,53 @@ class TestAddEvidence:
 
 class TestConvergenceRules:
     def test_three_high_disc_same_direction_updates_regime(self, ach_engine):
-        """>=3 high-disc evidence all pointing h1 -> LEAN_H1."""
-        # Q1 high-disc evidence_ids: 1 (q1_e1), 2 (q1_e2), 3 (q1_e3), 8 (q1_e8)
+        """>=3 high-disc evidence all pointing h1 -> LEAN_H1.
+        v5.4 Q1 high-disc: 1,2,3,4 (all high); 5 is medium.
+        """
         ach_engine.add_evidence(_ev("q1", 1, "h1"))
         ach_engine.add_evidence(_ev("q1", 2, "h1"))
         ach_engine.add_evidence(_ev("q1", 3, "h1"))
         assert ach_engine.evaluate_regime("q1") == RegimeType.lean_h1
 
-    def test_three_high_disc_h3_gives_confirmed(self, ach_engine):
-        """>=3 high-disc pointing h3 -> CONFIRMED_H3 (Q1 only)."""
+    def test_three_high_disc_h3_gives_confirmed_when_not_suspended(self, ach_engine_h3_active):
+        """>=3 high-disc pointing h3 -> CONFIRMED_H3, but only when H3 is NOT suspended."""
+        ach_engine_h3_active.add_evidence(_ev("q1", 1, "h3"))
+        ach_engine_h3_active.add_evidence(_ev("q1", 2, "h3"))
+        ach_engine_h3_active.add_evidence(_ev("q1", 3, "h3"))
+        assert ach_engine_h3_active.evaluate_regime("q1") == RegimeType.confirmed_h3
+
+    def test_h3_suspended_excludes_h3_evidence(self, ach_engine):
+        """v5.4: When H3 suspended, h3 direction evidence is excluded -> WIDE."""
         ach_engine.add_evidence(_ev("q1", 1, "h3"))
         ach_engine.add_evidence(_ev("q1", 2, "h3"))
         ach_engine.add_evidence(_ev("q1", 3, "h3"))
-        assert ach_engine.evaluate_regime("q1") == RegimeType.confirmed_h3
+        assert ach_engine.evaluate_regime("q1") == RegimeType.wide
 
     def test_three_high_disc_h2_gives_lean_h2(self, ach_engine):
-        """>=3 high-disc pointing h2 -> LEAN_H2."""
+        """>=3 high-disc pointing h2 -> LEAN_H2.
+        v5.4: use ids 1,2,3 (all high-disc in new evidence set).
+        """
         ach_engine.add_evidence(_ev("q1", 1, "h2"))
         ach_engine.add_evidence(_ev("q1", 2, "h2"))
-        ach_engine.add_evidence(_ev("q1", 8, "h2"))
+        ach_engine.add_evidence(_ev("q1", 3, "h2"))
         assert ach_engine.evaluate_regime("q1") == RegimeType.lean_h2
 
-    def test_only_medium_low_does_not_update(self, ach_engine):
-        """Even many medium/low evidence -> stays WIDE."""
-        # Q1 medium: 4,5,6,7; low: 9
-        for eid in [4, 5, 6, 7, 9]:
-            ach_engine.add_evidence(_ev("q1", eid, "h1"))
+    def test_only_medium_does_not_update(self, ach_engine):
+        """Even many medium evidence -> stays WIDE.
+        v5.4 Q1: only id 5 is medium.
+        """
+        ach_engine.add_evidence(_ev("q1", 5, "h1"))
         assert ach_engine.evaluate_regime("q1") == RegimeType.wide
 
     def test_single_contrary_high_disc_reverts(self, ach_engine):
-        """After establishing LEAN_H1, one contrary high-disc -> back to WIDE."""
-        # Establish LEAN_H1 with 3 high-disc h1
+        """After establishing LEAN_H1, one contrary high-disc h2 -> back to WIDE."""
         ach_engine.add_evidence(_ev("q1", 1, "h1"))
         ach_engine.add_evidence(_ev("q1", 2, "h1"))
         ach_engine.add_evidence(_ev("q1", 3, "h1"))
         assert ach_engine.evaluate_regime("q1") == RegimeType.lean_h1
 
-        # Add 1 high-disc evidence pointing h3
-        ach_engine.add_evidence(_ev("q1", 8, "h3"))
+        # Add 1 high-disc evidence pointing h2 (id 4 is also high-disc in v5.4)
+        ach_engine.add_evidence(_ev("q1", 4, "h2"))
         assert ach_engine.evaluate_regime("q1") == RegimeType.wide
 
     def test_neutral_does_not_contribute(self, ach_engine):
@@ -146,30 +163,30 @@ class TestStaleness:
 
 class TestQ2ACH:
     def test_q2_only_two_hypotheses(self, ach_engine):
-        """Q2 has h1/h2 only. Single high-disc doesn't reach >=3 threshold."""
-        # Q2 high-disc: 1 (q2_e1), 2 (q2_e2), 3 (q2_e3), 4 (q2_e4)
+        """Q2 has h1/h2 only. Single high-disc doesn't reach >=3 threshold.
+        v5.4 Q2: all 3 items (AP/P&I/TD3) are high-disc.
+        """
         ach_engine.add_evidence(_ev("q2", 1, "h1"))
         assert ach_engine.evaluate_regime("q2") == RegimeType.wide
 
     def test_q2_convergence_with_three_high_disc(self, ach_engine):
-        """Q2 with >=3 high-disc same direction -> converges."""
+        """Q2 with 3 high-disc same direction -> converges."""
         ach_engine.add_evidence(_ev("q2", 1, "h1"))
         ach_engine.add_evidence(_ev("q2", 2, "h1"))
         ach_engine.add_evidence(_ev("q2", 3, "h1"))
         assert ach_engine.evaluate_regime("q2") == RegimeType.lean_h1
 
-    def test_q2_medium_only_stays_wide(self, ach_engine):
-        """Q2 with only medium/low evidence stays WIDE."""
-        for eid in [5, 6, 7]:
+    def test_q2_nonexistent_ids_stay_wide(self, ach_engine):
+        """v5.4: Q2 only has 3 evidence items. Nonexistent IDs default to low disc."""
+        for eid in [4, 5, 6]:
             ach_engine.add_evidence(_ev("q2", eid, "h1"))
         assert ach_engine.evaluate_regime("q2") == RegimeType.wide
 
     def test_q2_contrary_reverts(self, ach_engine):
-        """Q2 contrary high-disc reverts to WIDE."""
+        """Q2: 2 h1 + 1 h2 among 3 high-disc -> no direction reaches 3 -> WIDE."""
         ach_engine.add_evidence(_ev("q2", 1, "h1"))
         ach_engine.add_evidence(_ev("q2", 2, "h1"))
-        ach_engine.add_evidence(_ev("q2", 3, "h1"))
-        assert ach_engine.evaluate_regime("q2") == RegimeType.lean_h1
-
-        ach_engine.add_evidence(_ev("q2", 4, "h2"))
+        # Add contrary evidence at a new timestamp (most recent wins per evidence_id)
+        fresh = datetime.now(UTC)
+        ach_engine.add_evidence(_ev("q2", 3, "h2", ts=fresh))
         assert ach_engine.evaluate_regime("q2") == RegimeType.wide

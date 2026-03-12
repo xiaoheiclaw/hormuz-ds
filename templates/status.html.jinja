@@ -37,83 +37,90 @@
   .kv { display: flex; justify-content: space-between; padding: 2px 0; }
   .kv-label { color: #8b949e; }
   .kv-value { color: #c9d1d9; font-weight: bold; }
-  .weight-bar { display: flex; height: 20px; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .weight-bar { display: flex; height: 24px; border-radius: 3px; overflow: hidden; margin-top: 6px; }
   .weight-a { background: #3fb950; }
   .weight-b { background: #d29922; }
   .weight-c { background: #da3633; }
-  .weight-label { font-size: 11px; text-align: center; color: #fff; line-height: 20px; }
+  .weight-label { font-size: 11px; text-align: center; color: #fff; line-height: 24px; }
+  .path-desc { color: #8b949e; font-size: 12px; margin-top: 8px; }
+  .path-desc dt { color: #c9d1d9; font-weight: bold; display: inline; }
+  .path-desc dd { display: inline; margin-left: 0; }
   .ts { color: #484f58; font-size: 11px; }
   .empty { color: #484f58; font-style: italic; }
   footer { margin-top: 16px; color: #484f58; font-size: 11px; text-align: center; }
 </style>
 </head>
 <body>
-<h1>⚓ Hormuz 决策仪表盘{% if is_weekly %} — 周报 {{ week_label }}{% endif %}</h1>
+<h1>Hormuz 决策仪表盘{% if is_weekly %} — 周报 {{ week_label }}{% endif %}</h1>
 <div class="ts">生成时间: {{ generated_at }}</div>
 
 <div class="grid" style="margin-top: 16px;">
 
-{# ===== 1. 状态总览 ===== #}
-<div class="panel">
-  <h2>状态总览</h2>
+{# ===== 1. ABC 路径 ===== #}
+<div class="panel panel-wide">
+  <h2>ABC 路径权重</h2>
   <div class="kv"><span class="kv-label">冲突周</span><span class="kv-value">第 {{ week_number }} 周</span></div>
   {% if path_weights %}
-  <div class="kv"><span class="kv-label">路径权重</span><span class="kv-value">A={{ (path_weights.a * 100)|round|int }}% / B={{ (path_weights.b * 100)|round|int }}% / C={{ (path_weights.c * 100)|round|int }}%</span></div>
-  <div class="weight-bar">
-    <div class="weight-a weight-label" style="width:{{ (path_weights.a * 100)|round|int }}%">A {{ (path_weights.a * 100)|round|int }}</div>
-    <div class="weight-b weight-label" style="width:{{ (path_weights.b * 100)|round|int }}%">B {{ (path_weights.b * 100)|round|int }}</div>
-    <div class="weight-c weight-label" style="width:{{ (path_weights.c * 100)|round|int }}%">C {{ (path_weights.c * 100)|round|int }}</div>
+  <div class="weight-bar" style="margin-top: 10px;">
+    <div class="weight-a weight-label" style="width:{{ (path_weights.a * 100)|round|int }}%">A {{ (path_weights.a * 100)|round|int }}%</div>
+    <div class="weight-b weight-label" style="width:{{ (path_weights.b * 100)|round|int }}%">B {{ (path_weights.b * 100)|round|int }}%</div>
+    <div class="weight-c weight-label" style="width:{{ (path_weights.c * 100)|round|int }}%">C {{ (path_weights.c * 100)|round|int }}%</div>
   </div>
+  <dl class="path-desc" style="margin-top: 10px;">
+    <dt>A</dt><dd>快速解决 (IRGC 衰减 + 护航到位 → 通行恢复)</dd><br>
+    <dt>B</dt><dd>拉锯消耗 (攻击持续但强度递减 → 部分通行)</dd><br>
+    <dt>C</dt><dd>升级扩大 (水雷封锁 + 基础设施打击 → 长期中断)</dd>
+  </dl>
   {% else %}
   <div class="empty">暂无路径权重数据</div>
   {% endif %}
-  {% if latest_brent is not none %}
-  <div class="kv" style="margin-top: 6px;"><span class="kv-label">Brent 收盘</span><span class="kv-value">${{ latest_brent }}</span></div>
-  {% endif %}
-  {% if mc_result %}
-  <div class="kv"><span class="kv-label">MC 均价</span><span class="kv-value">${{ mc_result.price_mean }}</span></div>
-  <div class="kv"><span class="kv-label">MC P10/P50/P90</span><span class="kv-value">${{ mc_result.price_p10 }} / ${{ mc_result.price_p50 }} / ${{ mc_result.price_p90 }}</span></div>
-  {% endif %}
 </div>
 
-{# ===== 2. 物理层 ===== #}
+{# ===== 2. 制度层 ===== #}
 <div class="panel">
-  <h2>物理层</h2>
+  <h2>ACH 制度</h2>
   <div class="kv">
-    <span class="kv-label">Q1 制度</span>
+    <span class="kv-label">Q1 主动威胁</span>
     <span>{% if q1_regime %}
       {% if q1_regime.regime.value == 'wide' %}<span class="badge badge-green">{{ q1_regime.regime.value }}</span>
       {% elif q1_regime.regime.value == 'confirmed_h3' %}<span class="badge badge-red">{{ q1_regime.regime.value }}</span>
       {% else %}<span class="badge badge-yellow">{{ q1_regime.regime.value }}</span>{% endif %}
-    {% else %}<span class="badge badge-grey">未知</span>{% endif %}</span>
+    {% else %}<span class="badge badge-grey">wide (默认)</span>{% endif %}</span>
   </div>
   <div class="kv">
-    <span class="kv-label">Q2 制度</span>
+    <span class="kv-label">Q2 水雷威胁</span>
     <span>{% if q2_regime %}
       {% if q2_regime.regime.value == 'wide' %}<span class="badge badge-green">{{ q2_regime.regime.value }}</span>
       {% elif q2_regime.regime.value == 'confirmed_h3' %}<span class="badge badge-red">{{ q2_regime.regime.value }}</span>
       {% else %}<span class="badge badge-yellow">{{ q2_regime.regime.value }}</span>{% endif %}
-    {% else %}<span class="badge badge-grey">未知</span>{% endif %}</span>
+    {% else %}<span class="badge badge-grey">wide (默认)</span>{% endif %}</span>
   </div>
-  {% if mc_params %}
-  <div style="margin-top: 10px;">
-    <div class="kv"><span class="kv-label">irgc_decay_mean</span><span class="kv-value">{{ mc_params.irgc_decay_mean }} 周</span></div>
-    <div class="kv"><span class="kv-label">convoy_start_mean</span><span class="kv-value">{{ mc_params.convoy_start_mean }} 周</span></div>
-    <div class="kv"><span class="kv-label">disruption_range</span><span class="kv-value">{{ mc_params.disruption_range[0] }} – {{ mc_params.disruption_range[1] }}</span></div>
-    <div class="kv"><span class="kv-label">pipeline_max</span><span class="kv-value">{{ mc_params.pipeline_max }} mbd</span></div>
+  <div style="margin-top: 8px; font-size: 12px; color: #8b949e;">
+    H3 suspended (v5.4) · 收敛阈值: 3 高判别力同向
   </div>
+</div>
+
+{# ===== 3. 物理参数 ===== #}
+<div class="panel">
+  <h2>物理参数</h2>
+  {% if phys_params %}
+  <div class="kv"><span class="kv-label">IRGC 衰减均值</span><span class="kv-value">{{ phys_params.irgc_decay_mean }} 周</span></div>
+  <div class="kv"><span class="kv-label">护航启动均值</span><span class="kv-value">{{ phys_params.convoy_start_mean }} 周</span></div>
+  <div class="kv"><span class="kv-label">总中断缺口</span><span class="kv-value">16.0 mbd (80% step)</span></div>
+  <div class="kv"><span class="kv-label">管道替代上限</span><span class="kv-value">{{ phys_params.pipeline_max }} mbd</span></div>
+  <div class="kv"><span class="kv-label">SPR 释放速率</span><span class="kv-value">{{ phys_params.spr_rate_mean }} mbd</span></div>
   {% else %}
-  <div class="empty">暂无 MC 参数</div>
+  <div class="empty">暂无物理参数</div>
   {% endif %}
 </div>
 
-{# ===== 3. 观测层 ===== #}
+{# ===== 4. 绊线状态 ===== #}
 <div class="panel panel-wide">
-  <h2>观测层</h2>
+  <h2>Grabo 绊线</h2>
   <div style="display: flex; gap: 24px; flex-wrap: wrap;">
     <div>
       <strong style="color:#8b949e;">绊线 (T)</strong><br>
-      {% for sid in ['T1', 'T2', 'T3'] %}
+      {% for sid in ['T1a', 'T1b', 'T2', 'T3'] %}
         {% set status = signal_map.get(sid, 'inactive') %}
         <span class="dot dot-{{ status_color(status) }}"></span>{{ sid }}
         {% if status != 'inactive' %}<span style="color:#8b949e;font-size:11px;">({{ status }})</span>{% endif %}
@@ -139,8 +146,13 @@
       {% endfor %}
     </div>
   </div>
+</div>
+
+{# ===== 5. 观测流 ===== #}
+<div class="panel panel-wide">
+  <h2>近期观测</h2>
   {% if recent_observations %}
-  <table style="margin-top: 12px;">
+  <table>
     <tr><th>时间</th><th>来源</th><th>类别</th><th>指标</th><th>值</th></tr>
     {% for obs in recent_observations[-10:] %}
     <tr>
@@ -152,12 +164,14 @@
     </tr>
     {% endfor %}
   </table>
+  {% else %}
+  <div class="empty">暂无观测数据</div>
   {% endif %}
 </div>
 
-{# ===== 4. 博弈层 ===== #}
+{# ===== 6. 博弈层 ===== #}
 <div class="panel">
-  <h2>博弈层</h2>
+  <h2>谢林信号</h2>
   {% if schelling_observations %}
   <table>
     <tr><th>时间</th><th>信号</th><th>Delta</th></tr>
@@ -174,29 +188,19 @@
   {% endif %}
 </div>
 
-{# ===== 5. 仓位 ===== #}
+{# ===== Brent 参考 ===== #}
 <div class="panel">
-  <h2>仓位</h2>
-  {% if positions %}
-  <table>
-    <tr><th>时间</th><th>触发</th><th>动作</th></tr>
-    {% for pos in positions %}
-    <tr>
-      <td class="ts">{{ pos.timestamp.strftime('%m-%d %H:%M') }}</td>
-      <td>{{ pos.trigger }}</td>
-      <td>{{ pos.action }}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <h2>市场参考</h2>
+  {% if latest_brent is not none %}
+  <div class="kv"><span class="kv-label">Brent 收盘</span><span class="kv-value">${{ "%.1f"|format(latest_brent) }}</span></div>
   {% else %}
-  <div class="empty">暂无待执行仓位信号</div>
+  <div class="empty">暂无市场数据</div>
   {% endif %}
 </div>
 
 </div>
 
 {% if is_weekly %}
-{# ===== Weekly extras ===== #}
 <div class="grid" style="margin-top: 16px;">
   <div class="panel panel-wide">
     <h2>本周 ACH 证据</h2>

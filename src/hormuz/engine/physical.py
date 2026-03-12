@@ -1,4 +1,9 @@
-"""Physical layer: state equations for Q1/Q2/Q3 and regime→parameter mapping."""
+"""Physical layer: state equations for Q1/Q2/Q3 and regime→parameter mapping.
+
+v5.4: Disruption rate is a step function (~80%) during T, not driven by
+IRGC capability decay. Decay only affects T1 length (when Q2 can start).
+Insurance withdrawal is actuarial reflection of physical threats, not causal.
+"""
 import math
 
 from hormuz.models import RegimeType
@@ -7,10 +12,11 @@ from hormuz.models import RegimeType
 class PhysicalLayer:
     """Physical model for Hormuz strait crisis scenarios.
 
-    Encapsulates three sub-models:
-    - Q1: IRGC capability decay (exponential)
-    - Q2: Mine accumulation (deploy vs sweep, gated by Q1 attacks)
-    - Q3: Global oil buffer ramp-up (pipeline + SPR + reroute + surplus)
+    v5.4 model:
+    - Q1: IRGC capability decay (only affects T1 length, not disruption rate)
+    - Q2: Mine density from U[20,100] + sweep rate → T2 duration
+    - Q3: Buffer ramp-up (pipeline + SPR + reroute + surplus)
+    - Gross gap = 16 mbd constant during T = T1 + T2
     """
 
     def __init__(self, params_config: dict):
@@ -19,15 +25,21 @@ class PhysicalLayer:
         q2 = params_config["q2"]
         q3 = params_config["q3"]
 
+        # v5.4 gross gap constants
+        self.normal_flow = params_config.get("normal_flow_mbd", 20.1)
+        self.effective_disruption_rate = params_config.get("effective_disruption_rate", 0.80)
+        self.gross_gap = params_config.get("gross_gap_mbd", 16.0)
+
         # Q1 defaults
         self.irgc_decay_mean_default = q1["irgc_decay_mean_weeks"]
-        self.disruption_range = tuple(q1["disruption_range"])
         self.attack_threshold = q1["attack_threshold_per_day"]
+        self.h3_suspended = q1.get("h3_suspended", True)
 
         # Q2 defaults
         self.mine_initial_stock = q2["mine_initial_stock"]
         self.convoy_start_mean_default = q2["convoy_start_mean_weeks"]
-        self.sea_mines_current = q2["sea_mines_current"]
+        # v5.4: uniform distribution, not point estimate
+        self.sea_mines_range = q2.get("sea_mines_range", [20, 100])
         self.sweep_ships_available = q2["sweep_ships_available"]
 
         # Q3 defaults
@@ -40,18 +52,10 @@ class PhysicalLayer:
     def update_params(self, q1_regime: RegimeType, q2_regime: RegimeType) -> dict:
         """Map regime judgments to MC parameter adjustments.
 
-        Q1 regime → irgc_decay_mean:
-        - wide: keep default (6.0 weeks)
-        - lean_h1: reduce to 4.0 weeks (decaying faster)
-        - lean_h2: keep default (6.0 weeks)
-        - confirmed_h3: increase to 15.0 weeks (resupply extends endurance)
-
-        Q2 regime → convoy_start_mean:
-        - wide: keep default (5.0 weeks)
-        - lean_h1: reduce by 1.0 week (4.0)
-        - lean_h2: increase by 1.5 weeks (6.5)
+        v5.4: decay_mean only affects T1 length; disruption rate is constant 80%.
+        convoy_start_mean still driven by Q2 regime. No more disruption_range.
         """
-        # Q1 regime → decay mean
+        # Q1 regime → decay mean (affects T1 duration only)
         decay_map = {
             RegimeType.wide: self.irgc_decay_mean_default,
             RegimeType.lean_h1: 4.0,
@@ -72,7 +76,6 @@ class PhysicalLayer:
         return {
             "irgc_decay_mean": irgc_decay_mean,
             "convoy_start_mean": convoy_start_mean,
-            "disruption_range": self.disruption_range,
             "pipeline_max": self.pipeline_max,
             "pipeline_ramp_weeks": self.pipeline_ramp_weeks,
             "spr_rate_mean": self.spr_rate_mean,

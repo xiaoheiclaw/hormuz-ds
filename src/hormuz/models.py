@@ -130,12 +130,15 @@ class Signal(BaseModel):
 
 
 class MCParams(BaseModel):
-    """Complete MC parameter snapshot."""
+    """Complete MC parameter snapshot.
+
+    v5.4: disruption_range removed. Gross gap is constant 16 mbd (step function).
+    irgc_decay_mean now only affects T1 duration, not disruption percentage.
+    """
     id: Optional[int] = None
     timestamp: datetime
     irgc_decay_mean: float
     convoy_start_mean: float
-    disruption_range: tuple[float, float]
     pipeline_max: float
     pipeline_ramp_weeks: float
     spr_rate_mean: float

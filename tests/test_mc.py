@@ -19,7 +19,6 @@ def base_params() -> MCParams:
         timestamp=datetime(2026, 3, 11),
         irgc_decay_mean=6.0,
         convoy_start_mean=5.0,
-        disruption_range=(0.55, 0.90),
         pipeline_max=4.0,
         pipeline_ramp_weeks=2.5,
         spr_rate_mean=2.5,
@@ -69,8 +68,8 @@ class TestPhase1:
         assert result.path_c_price > MCModel.BASE_PRICE
 
     def test_prices_realistic_range(self, mc, base_params):
-        """Prices should be in realistic range for Hormuz crisis."""
+        """v5.4: prices based on 16 mbd step function gross gap."""
         result = mc.run(base_params)
-        assert 80 < result.price_mean < 200
-        assert 70 < result.price_p10 < 150
-        assert 90 < result.price_p90 < 250
+        assert 80 < result.price_mean < 250
+        assert 70 < result.price_p10 < 200
+        assert 90 < result.price_p90 < 300

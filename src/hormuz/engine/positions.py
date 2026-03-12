@@ -1,4 +1,10 @@
-"""Position rules engine — maps observations + MC output to position signals."""
+"""Position rules engine — maps observations + MC output to position signals.
+
+v5.4 exit rules:
+- T-end: transit ↑3d + AP<1% → unwind vol, energy ladder down
+- $150 demand destruction: clear energy long, recession hedge ×2
+- $80 external shock: logic paradox with 10+ mbd gap, force exit energy
+"""
 from collections import defaultdict
 from datetime import datetime, UTC
 
@@ -33,6 +39,7 @@ class PositionEngine:
 
         # --- HARD STOP-LOSS ---
         signals.extend(self._check_brent_stop(observations, now))
+        signals.extend(self._check_demand_destruction(observations, now))
         signals.extend(self._check_portfolio_loss(observations, now))
 
         # --- MC-DRIVEN RULES ---
@@ -82,6 +89,10 @@ class PositionEngine:
     # -- HARD STOP-LOSS rules --
 
     def _check_brent_stop(self, obs: list[Observation], now: datetime) -> list[PositionSignal]:
+        """v5.4: $80 = external recession shock, NOT path C extension.
+        Logic paradox: <$80 contradicts 10+ mbd net gap. Either path A/B
+        terminated via unobserved channel, or independent macro collapse.
+        """
         brent_below = self.stop_loss.get("brent_below", 80)
         required_days = self.stop_loss.get("days", 3)
 
@@ -91,8 +102,30 @@ class PositionEngine:
         if consecutive >= required_days:
             return [PositionSignal(
                 timestamp=now,
-                trigger=f"brent_stop_loss: <${brent_below} for {consecutive} consecutive days",
-                action="平掉全部能源超配",
+                trigger=f"brent_external_shock: <${brent_below} for {consecutive}d (logic paradox with net gap)",
+                action="强制平所有能源超配，无视中东物理模型",
+                executed=False,
+            )]
+        return []
+
+    def _check_demand_destruction(self, obs: list[Observation], now: datetime) -> list[PositionSignal]:
+        """v5.4: Brent >$150 = demand destruction terminal for path C.
+        Price has reached forced demand destruction threshold. Regardless of
+        physical gap size, clear energy long and switch to recession logic.
+        """
+        dd_config = self.config.get("demand_destruction", {})
+        brent_above = dd_config.get("brent_above", 150)
+
+        daily = self._daily_values(obs, "brent_price")
+        if not daily:
+            return []
+
+        latest_price = list(daily.values())[-1]
+        if latest_price > brent_above:
+            return [PositionSignal(
+                timestamp=now,
+                trigger=f"demand_destruction: Brent>${brent_above} (path C endgame)",
+                action="清能源多头，衰退对冲×2，切换宏观衰退逻辑",
                 executed=False,
             )]
         return []

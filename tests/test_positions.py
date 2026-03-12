@@ -17,13 +17,14 @@ def pos_engine(tmp_db, parameters) -> PositionEngine:
 
 class TestHardStopLoss:
     def test_brent_below_80_three_days(self, pos_engine):
+        """v5.4: <$80 = external shock (logic paradox with net gap)."""
         obs = [
             Observation(timestamp=datetime(2026, 3, 9, tzinfo=UTC), source="yfinance", category="market", key="brent_price", value=79.0),
             Observation(timestamp=datetime(2026, 3, 10, tzinfo=UTC), source="yfinance", category="market", key="brent_price", value=78.0),
             Observation(timestamp=datetime(2026, 3, 11, tzinfo=UTC), source="yfinance", category="market", key="brent_price", value=77.0),
         ]
         signals = pos_engine.evaluate(observations=obs)
-        assert any("平掉全部能源超配" in s.action for s in signals)
+        assert any("强制平所有能源超配" in s.action for s in signals)
 
     def test_brent_above_80_no_stop(self, pos_engine):
         obs = [
@@ -32,7 +33,7 @@ class TestHardStopLoss:
             Observation(timestamp=datetime(2026, 3, 11, tzinfo=UTC), source="yfinance", category="market", key="brent_price", value=81.0),
         ]
         signals = pos_engine.evaluate(observations=obs)
-        assert not any("平掉" in s.action for s in signals)
+        assert not any("强制平" in s.action for s in signals)
 
     def test_brent_only_two_days_no_stop(self, pos_engine):
         """Only 2 days below 80 -> no stop loss."""
@@ -41,7 +42,23 @@ class TestHardStopLoss:
             Observation(timestamp=datetime(2026, 3, 11, tzinfo=UTC), source="yfinance", category="market", key="brent_price", value=78.0),
         ]
         signals = pos_engine.evaluate(observations=obs)
-        assert not any("平掉" in s.action for s in signals)
+        assert not any("强制平" in s.action for s in signals)
+
+    def test_brent_above_150_demand_destruction(self, pos_engine):
+        """v5.4: >$150 = demand destruction terminal (path C endgame)."""
+        obs = [
+            Observation(timestamp=datetime(2026, 3, 11, tzinfo=UTC), source="yfinance", category="market", key="brent_price", value=155.0),
+        ]
+        signals = pos_engine.evaluate(observations=obs)
+        assert any("清能源多头" in s.action for s in signals)
+
+    def test_brent_below_150_no_demand_destruction(self, pos_engine):
+        """$140 should NOT trigger demand destruction."""
+        obs = [
+            Observation(timestamp=datetime(2026, 3, 11, tzinfo=UTC), source="yfinance", category="market", key="brent_price", value=140.0),
+        ]
+        signals = pos_engine.evaluate(observations=obs)
+        assert not any("清能源多头" in s.action for s in signals)
 
     def test_portfolio_loss_exceeds_max(self, pos_engine):
         """Total portfolio loss > 8% -> halve all positions."""

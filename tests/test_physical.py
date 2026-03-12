@@ -39,11 +39,13 @@ class TestRegimeToParams:
     def test_all_params_present(self, physical):
         params = physical.update_params(q1_regime=RegimeType.wide, q2_regime=RegimeType.wide)
         for key in [
-            "irgc_decay_mean", "convoy_start_mean", "disruption_range",
+            "irgc_decay_mean", "convoy_start_mean",
             "pipeline_max", "pipeline_ramp_weeks", "spr_rate_mean",
             "spr_delay_weeks", "surplus_buffer",
         ]:
             assert key in params
+        # v5.4: disruption_range removed — gross gap is constant 16 mbd
+        assert "disruption_range" not in params
 
 
 class TestQ1Decay:

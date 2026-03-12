@@ -148,8 +148,7 @@ class TestMCParams:
             timestamp=datetime(2026, 3, 10),
             irgc_decay_mean=14.0,
             convoy_start_mean=7.0,
-            disruption_range=(0.3, 0.7),
-            pipeline_max=1.5,
+                        pipeline_max=1.5,
             pipeline_ramp_weeks=8.0,
             spr_rate_mean=1.0,
             spr_delay_weeks=2.0,
@@ -158,5 +157,4 @@ class TestMCParams:
             trigger="weekly_update",
         )
         assert params.path_weights.a == 0.30
-        assert params.disruption_range == (0.3, 0.7)
         assert params.trigger == "weekly_update"

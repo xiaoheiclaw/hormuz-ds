@@ -1,7 +1,10 @@
 """ACH (Analysis of Competing Hypotheses) Matrix Engine.
 
-Evaluates accumulated evidence against hypotheses for Q1/Q2 questions
-and produces regime judgments based on convergence rules.
+v5.4 changes:
+- H3 suspension: Mehrabad airport destroyed, Russian supply cut.
+  When H3 suspended, its prior (10%) is redistributed +5% to H1, +5% to H2.
+  Posterior updates run binary Bayesian between H1/H2 only.
+- Q1 evidence updated to non-visual high-frequency version (5 items).
 """
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
@@ -18,9 +21,12 @@ class ACHEngine:
 
     Takes evidence from the database, applies staleness decay and convergence
     rules, and returns regime judgments.
+
+    v5.4: H3 suspension support — when h3_suspended=True, H3 evidence is
+    excluded and regime evaluation only considers H1/H2 directions.
     """
 
-    def __init__(self, db: HormuzDB, ach_config: dict) -> None:
+    def __init__(self, db: HormuzDB, ach_config: dict, h3_suspended: bool = True) -> None:
         """Load evidence definitions from ach_config (from constants.yaml ach section).
 
         Builds a lookup: {question: {evidence_id(int): discriminating_power}}
@@ -28,6 +34,7 @@ class ACHEngine:
         """
         self.db = db
         self.ach_config = ach_config
+        self.h3_suspended = h3_suspended
         # Build disc power lookup: question -> evidence_id -> power
         self._disc_power: dict[str, dict[int, str]] = {}
         for question in ("q1", "q2"):
@@ -103,9 +110,14 @@ class ACHEngine:
             return RegimeType.wide
 
         # 4. Count high-disc evidence by direction (excluding neutral)
+        # v5.4: when H3 suspended for Q1, exclude h3 direction evidence
+        excluded_directions = {"neutral"}
+        if self.h3_suspended and question == "q1":
+            excluded_directions.add("h3")
+
         direction_counts: dict[str, int] = defaultdict(int)
         for ev in high_disc:
-            if ev.direction != "neutral":
+            if ev.direction not in excluded_directions:
                 direction_counts[ev.direction] += 1
 
         if not direction_counts:

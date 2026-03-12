@@ -1,15 +1,24 @@
 # Parameters — tunable, updated via calibration or human judgment
 
 physical:
+  # v5.4: gross gap = normal_flow * effective_disruption_rate
+  # 80% step function during T, calibrated: 1984 ~70%, 2026-03 ~92%
+  normal_flow_mbd: 20.1
+  effective_disruption_rate: 0.80
+  gross_gap_mbd: 16.0  # 20.1 * 0.80, constant during T
+
   q1:
     irgc_decay_mean_weeks: 6.0
-    disruption_range: [0.55, 0.90]
     attack_threshold_per_day: 2.0
+    # v5.4: H3 suspended (Mehrabad airport destroyed, supply cut)
+    h3_suspended: true
+    h3_prior: 0.10  # redistributed +5% to H1, +5% to H2 when suspended
 
   q2:
     mine_initial_stock: [2000, 6000]
     convoy_start_mean_weeks: 5.0
-    sea_mines_current: 50
+    # v5.4: uniform distribution, not point estimate
+    sea_mines_range: [20, 100]
     sweep_ships_available: 6
 
   q3:
@@ -18,6 +27,12 @@ physical:
     spr_rate_mean_mbd: 2.5
     spr_delay_weeks: 2.5
     surplus_buffer_mbd: 2.5
+
+# v5.4: buffer ramp breakpoints (net gap = gross_gap - buffer)
+buffer_ramp:
+  d1_d14_mbd: 1.5      # -> net gap ~14.5 mbd
+  d14_plus_mbd: 7.0     # -> net gap ~9.0 mbd
+  path_c_crash_mbd: 2.0 # Fujairah hit -> net gap ~14 mbd
 
 paths:
   a: 0.30
@@ -29,8 +44,12 @@ positions:
   vol_base_pct: 3
   recession_hedge_pct: 2
   stop_loss:
+    # v5.4: $80 = external recession shock (NOT path C extension)
     brent_below: 80
     days: 3
+  # v5.4: $150 = demand destruction terminal (path C endgame)
+  demand_destruction:
+    brent_above: 150
   max_loss_pct: 8
 
 schelling:
