@@ -5,17 +5,29 @@ directories:
   src/hormuz/:
     description: "Main package source"
     allow: ["*.py"]
-  src/hormuz/engine/:
-    description: "Core engine modules (ach, physical, signals, schelling, mc, positions)"
+  src/hormuz/core/:
+    description: "Pure computation — zero IO, zero side effects"
     allow: ["*.py"]
-  src/hormuz/llm/:
-    description: "LLM backend integration"
+  src/hormuz/infra/:
+    description: "IO layer — DB, network, LLM"
+    allow: ["*.py"]
+  src/hormuz/app/:
+    description: "Product layer — pipeline, CLI, reporting"
     allow: ["*.py"]
   configs/:
     description: "YAML configuration files"
     allow: ["*.yaml", "*.yml"]
   tests/:
     description: "Test files"
+    allow: ["*.py", "conftest.py"]
+  tests/test_core/:
+    description: "Core module tests"
+    allow: ["*.py"]
+  tests/test_infra/:
+    description: "Infra module tests"
+    allow: ["*.py"]
+  tests/test_app/:
+    description: "App module tests"
     allow: ["*.py"]
   templates/:
     description: "Jinja2 HTML report templates"
