@@ -1,35 +1,37 @@
-# Hormuz Decision System (hormuz-ds)
+# Hormuz Decision OS v5.4
 
 ## WHAT
-霍尔木兹海峡危机投资决策辅助系统。结构化情景分析 + 仓位管理，
-不是自动交易系统，所有仓位决策由人做出。
+霍尔木兹海峡危机投资决策操作系统。状态空间模型 + 贝叶斯推断引擎，
+输出 T 分布、净缺口轨迹、三路径总缺口与概率权重。
 
 ## WHY
 三个物理问题（主动威胁衰减/水雷演化/缓冲到位）决定油价路径，
-需要系统化跟踪观测、更新概率、生成仓位建议。
+需要系统化跟踪 13 类观测、贝叶斯更新假设、MC 模拟不确定性。
 
 ## HOW
-- Python 3.12+, SQLite, Jinja2, matplotlib
-- 管道式架构：ingester → analyzer → engine → reporter
-- 每 4h 自动运行（LaunchAgent），每周三人工深度分析
-- LLM 后端：OpenClaw agent（自动）/ Claude API（手动），config.yaml 切换
-- 数据源：Readwise（新闻/公报）+ yfinance（市场数据）+ 人工输入（判断类）
+- Python 3.12+, numpy, scipy, SQLite, Jinja2, matplotlib
+- 三层架构: core/(纯计算) + infra/(IO) + app/(产品)
+- core/ 映射 PRD M1-M5: ACH → T分布 → Buffer → 缺口积分 → 博弈调节
+- MC N=10000 联合采样 6 个不确定参数
+- 绊线穿透语义: signals.scan() 在 ACH 前执行
 
 ## 架构
-- 六层信息流：物理层 → 观测层 → 制度层 → 博弈层 → MC模型 → 仓位规则
-- Grabo 绊线穿透机制：T1-T3/E1-E4/C1-C2 跳过正常管道直达仓位
-- ACH 收敛规则：≥3高判别力同向→更新regime，单条反向→回退宽分布
-- MC 分阶段：Phase1 解析近似，Phase2 full MC
-
-## 项目结构
-- configs/：config.yaml + constants.yaml + parameters.yaml
-- src/hormuz/engine/：ach.py, physical.py, signals.py, schelling.py, mc.py, positions.py
-- data/hormuz.db：SQLite 单文件存储
-- templates/：Jinja2 HTML 模板
-- reports/：周报归档
+- core/types.py: PRD §2 六类变量 + §7 SystemOutput
+- core/m1_ach.py: 贝叶斯推断 (LR ∈ {0.2, 0.5, 1.0, 2.0, 5.0})
+- core/m2_duration.py: T₁对数正态 + T₂ stock-flow + 卷积合成
+- core/m3_buffer.py: pipeline(t) + spr(t) + cape(t) 三子缓冲
+- core/m4_gap.py: 分段积分 ∫₀ᵀ [16 - Buffer(t)] dt
+- core/m5_game.py: Schelling 信号 delta + 归一化 + clip
+- core/mc.py: N=10000 蒙特卡洛，路径分类 35/120 天
 
 ## 关键约定
-- 变量分类法：常数/参数/状态变量/观测/控制/校准参照，更新规则不同
-- 物理层优先：低层信号和高层信号矛盾时信低层
-- pipeline 执行顺序：绊线扫描 → ACH → 物理层 → 博弈层 → MC → 仓位
+- 物理 > 制度 > 博弈（因果优先级硬编码）
+- core/ 零 IO 零副作用，纯函数可独立测试
+- PathWeights 始终归一化，clip [0.05, 0.85]
 - position_signals.executed 是人机边界
+- H3（外部补给）挂起，先验 ±5% 分配给 H1/H2
+
+# currentDate
+Today's date is 2026-03-13.
+
+      IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.
