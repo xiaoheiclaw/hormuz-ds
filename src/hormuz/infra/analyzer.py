@@ -11,47 +11,61 @@ from hormuz.infra.llm import LLMBackend
 
 _EVIDENCE_MAP = {"high": 1.0, "medium": 0.5, "low": 0.2}
 
-_EXTRACTION_PROMPT = """You are an intelligence analyst for the Hormuz Strait crisis monitoring system.
+_EXTRACTION_PROMPT_TEMPLATE = """You are an intelligence analyst for the Hormuz Strait crisis monitoring system.
+
+## SITUATION CONTEXT
+{context}
 
 Extract observations AND Schelling game-theory signals from the following articles.
-Give VALUES that reflect reality, not your hypothesis about which side it supports.
+Give VALUES that reflect the CURRENT situation described in the articles.
+If an article describes ongoing conflict/attacks, the values should reflect that — do NOT default to 0.
+If articles don't mention a specific observation, OMIT it rather than guessing 0.
 
 Return JSON only:
-{
-  "observations": [{"id": "O01", "value": 0.8, "confidence": "high"}, ...],
-  "signals": [{"key": "external_mediation", "evidence": "high"}, ...]
-}
+{{
+  "observations": [{{"id": "O01", "value": 0.8, "confidence": "high"}}, ...],
+  "signals": [{{"key": "external_mediation", "evidence": "high"}}, ...]
+}}
 
 ## A-GROUP: Threat Status (feed ACH engine, 0-1 scale)
+## IMPORTANT: These cover ALL Iran/IRGC military activity in the Gulf region,
+## not just attacks on strait shipping. Include attacks on oil infrastructure,
+## ports, Gulf states, and general Iran military operations.
 
-O01 — attack_frequency: IRGC attacks on strait shipping in past 24h.
-  0=no attacks, 0.3=sporadic (1/day), 0.5=moderate (2/day), 0.8=heavy (4+/day), 1.0=saturated
-  News phrases: "CENTCOM reported X attacks", "no incidents reported", "surge in attacks"
+O01 — attack_frequency: Iran/IRGC military attacks in the Gulf/Hormuz region in past 24h.
+  Include: attacks on shipping, oil infrastructure, Gulf state territory, drone/missile strikes on ports.
+  0=no attacks anywhere in region, 0.3=sporadic (1-2/day), 0.5=moderate (3-5/day), 0.8=heavy (6+/day), 1.0=saturated/continuous
+  News phrases: "CENTCOM reported X attacks", "no incidents reported", "surge in attacks",
+  "drone strike on port", "oil terminal attacked", "missiles fired at Saudi/UAE/Oman",
+  "attacks on merchant vessels", "Gulf under wave of attacks"
 
 O02 — attack_trend_change: are attacks rising, stable, or declining vs recent days?
   0=sharp rise/new escalation, 0.5=stable/no change, 1.0=sharp decline
   News phrases: "attacks dropped 50%", "lull in hostilities", "3 days without incident",
-  "renewed wave of attacks", "escalation in frequency"
+  "renewed wave of attacks", "escalation in frequency", "both sides dig in"
 
-O03 — attack_coordination: tactical complexity of today's attacks.
-  0=single boat/blind fire/amateur, 0.5=some coordination, 1.0=multi-platform synchronized swarm
+O03 — attack_coordination: tactical complexity and sophistication of recent Iran/IRGC operations.
+  0=no organized attacks/amateur, 0.5=some coordination, 1.0=multi-platform synchronized operations
   News phrases: "coordinated multi-axis attack", "simultaneous strikes from multiple directions",
-  "isolated lone-wolf attack", "sophisticated swarming tactics"
+  "isolated lone-wolf attack", "sophisticated swarming tactics",
+  "multi-vector assault", "combined drone and missile strike"
 
-O04 — advanced_weapon_use: ratio of high-end weapons (ASCM/ASBM/cruise missiles) vs low-end (drones/FIAC/unguided).
+O04 — advanced_weapon_use: ratio of high-end weapons (ASCM/ASBM/cruise missiles/ballistic) vs low-end (drones/FIAC/unguided).
   0=only crude/cheap weapons, 0.5=mixed, 1.0=exclusively advanced missiles
   News phrases: "anti-ship missile fired", "only suicide drones used", "cruise missile intercepted",
-  "no high-end munitions observed", "switched to cheap UAVs"
+  "ballistic missiles launched", "switched to cheap UAVs", "Iranian missile strikes"
 
-O05 — gps_spoofing_complexity: electronic warfare sophistication in strait waters.
+O05 — gps_spoofing_complexity: electronic warfare sophistication in Gulf/strait waters.
   0=no EW activity, 0.3=basic jamming, 0.7=complex geometric spoofing, 1.0=advanced multi-frequency
   News phrases: "GPS spoofing cluster detected", "AIS anomalies", "phantom vessel tracks",
-  "electronic warfare activity ceased", "jamming signals reported"
+  "electronic warfare activity ceased", "jamming signals reported",
+  "ships must coordinate with Iran's navy" (implies EW/control)
 
-O06 — network_fragmentation: geographic distribution of IRGC launch sites.
-  0=collapsed to few inland sites, 0.5=partial fragmentation, 1.0=distributed coastal multi-node network
+O06 — network_fragmentation: geographic distribution of IRGC operational capability.
+  0=collapsed to few inland sites, 0.5=partial fragmentation, 1.0=distributed multi-node network active
   News phrases: "attacks only from mountain positions", "coastal launch sites destroyed",
-  "multiple firing positions along coastline", "dispersed mobile launchers"
+  "multiple firing positions along coastline", "dispersed mobile launchers",
+  "Iran's allies step up strikes", "Hezbollah/Houthi coordinated action"
 
 ## B-GROUP: Blockade/Recovery (0-1 scale except O07, O09)
 
@@ -129,12 +143,36 @@ irgc_fragmentation — Signs of IRGC internal disagreement.
   NOTE: Only include if US inconsistency also present (validates interpretation).
 
 ## RULES
-- Only extract observations you can infer from the articles. Do not fabricate.
+- Extract observations you can infer from the articles. Reasonable inference is OK — do not require exact quotes.
+- If articles describe active conflict but don't give exact attack counts, estimate based on intensity described (e.g., "heavy fighting" → O01 ≈ 0.7-0.8).
+- If articles don't mention a specific observation AT ALL, OMIT it from the output (don't guess 0).
 - Give confidence: "high" (explicit numbers/quotes), "medium" (reasonable inference), "low" (vague mention).
 - O01-O06, O08, O10, O11, O14: stay within [0, 1].
 - O07: percentage points. O09: WS points. O12: $/mt. O13: mbd.
 - signals: array of objects with "key" and "evidence" (high/medium/low). Empty array if no signals detected. Most days will be empty.
 """
+
+
+def _build_context(conflict_day: int | None = None, previous_obs: dict[str, float] | None = None) -> str:
+    """Build situation context string for extraction prompt."""
+    parts = []
+    if conflict_day is not None and conflict_day > 0:
+        parts.append(f"This is DAY {conflict_day} of the US-Israel vs Iran conflict in the Gulf region.")
+        parts.append("There is an active military conflict. Attacks on shipping, oil infrastructure, and Gulf states are ongoing.")
+    if previous_obs:
+        lines = []
+        for oid, val in sorted(previous_obs.items()):
+            lines.append(f"  {oid}={val:.2f}")
+        parts.append("Previous observation values (use as baseline, update based on new articles):\n" + "\n".join(lines))
+    if not parts:
+        parts.append("Monitor the Hormuz Strait region for crisis-related developments.")
+    return "\n".join(parts)
+
+
+def build_extraction_prompt(conflict_day: int | None = None, previous_obs: dict[str, float] | None = None) -> str:
+    """Build the full extraction prompt with dynamic context."""
+    context = _build_context(conflict_day, previous_obs)
+    return _EXTRACTION_PROMPT_TEMPLATE.format(context=context)
 
 
 @dataclass
@@ -148,6 +186,8 @@ async def _extract_batch(
     articles: list[dict],
     llm: LLMBackend,
     ts: datetime,
+    conflict_day: int | None = None,
+    previous_obs: dict[str, float] | None = None,
 ) -> tuple[list[Observation], list[SignalEvidence]]:
     """Extract observations and signals from a single batch of articles."""
     text_parts = []
@@ -155,7 +195,8 @@ async def _extract_batch(
         text_parts.append(f"[{a.get('source', 'unknown')}] {a.get('title', '')}\n{a.get('summary', '')}")
     text = "\n\n---\n\n".join(text_parts)
 
-    result = await llm.extract(text, _EXTRACTION_PROMPT)
+    prompt = build_extraction_prompt(conflict_day=conflict_day, previous_obs=previous_obs)
+    result = await llm.extract(text, prompt)
 
     observations = []
     for item in result.get("observations", []):
@@ -196,6 +237,8 @@ async def extract_observations(
     llm: LLMBackend,
     timestamp: datetime | None = None,
     batch_size: int = 5,
+    conflict_day: int | None = None,
+    previous_obs: dict[str, float] | None = None,
 ) -> ExtractionResult:
     """Extract O01-O14 observations + Schelling signals from articles in batches.
 
@@ -214,7 +257,11 @@ async def extract_observations(
     for i in range(0, len(articles), batch_size):
         batch = articles[i : i + batch_size]
         try:
-            batch_obs, batch_sigs = await _extract_batch(batch, llm, ts)
+            batch_obs, batch_sigs = await _extract_batch(
+                batch, llm, ts,
+                conflict_day=conflict_day,
+                previous_obs=previous_obs,
+            )
             all_obs.extend(batch_obs)
             all_signals.extend(batch_sigs)
         except Exception:

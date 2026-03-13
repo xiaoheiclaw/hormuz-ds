@@ -187,6 +187,28 @@ async def run_pipeline(config: dict) -> dict:
         articles, market = [], {}
         result["steps_completed"] += 1
 
+    # Compute conflict day for LLM context
+    conflict_start = config.get("conflict", {}).get("start_date", "2026-03-01")
+    try:
+        conflict_day = (datetime.now() - datetime.strptime(conflict_start, "%Y-%m-%d")).days
+    except (ValueError, TypeError):
+        conflict_day = None
+
+    # Fetch previous observation values as baseline for LLM
+    previous_obs: dict[str, float] | None = None
+    try:
+        from datetime import timedelta
+        recent = get_observations(db_path, since=datetime.now() - timedelta(hours=12))
+        if recent:
+            # Keep latest value per obs ID
+            prev: dict[str, float] = {}
+            for o in sorted(recent, key=lambda x: x.timestamp):
+                prev[o.id] = o.value
+            if prev:
+                previous_obs = prev
+    except Exception:
+        pass
+
     # Step 2: LLM observation + Schelling signal extraction
     llm_signals: list[str] = []
     try:
@@ -196,7 +218,11 @@ async def run_pipeline(config: dict) -> dict:
         backend_kwargs = llm_config.get(backend_type, {})
         llm = create_llm_backend(backend_type, **backend_kwargs)
         parsed = parse_readwise_articles(articles)[:30]
-        extraction = await extract_observations(parsed, llm=llm, batch_size=5)
+        extraction = await extract_observations(
+            parsed, llm=llm, batch_size=5,
+            conflict_day=conflict_day,
+            previous_obs=previous_obs,
+        )
         llm_obs = extraction.observations
         llm_signals = extraction.signals
         result["steps_completed"] += 1

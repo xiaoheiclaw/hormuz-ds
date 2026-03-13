@@ -45,6 +45,7 @@ async def fetch_readwise_articles(
             params: dict = {
                 "page_size": min(limit - len(all_docs), 100),
                 "location": "feed",
+                "withHtmlContent": "true",
             }
             if cursor:
                 params["pageCursor"] = cursor
@@ -85,6 +86,25 @@ async def fetch_readwise_articles(
     return all_docs
 
 
+def _html_to_text(html: str | None) -> str:
+    """Strip HTML tags to plain text. Lightweight, no external deps."""
+    if not html:
+        return ""
+    import re
+    text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.S)
+    text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.S)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+    text = re.sub(r"</(p|div|h[1-6]|li|tr)>", "\n", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"&nbsp;", " ", text)
+    text = re.sub(r"&amp;", "&", text)
+    text = re.sub(r"&lt;", "<", text)
+    text = re.sub(r"&gt;", ">", text)
+    text = re.sub(r"&#\d+;", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()[:3000]  # Cap at 3000 chars per article for LLM context
+
+
 def parse_readwise_articles(raw: list[dict], relevance_filter: bool = True) -> list[dict]:
     """Normalize article fields from Readwise response.
 
@@ -93,7 +113,8 @@ def parse_readwise_articles(raw: list[dict], relevance_filter: bool = True) -> l
     """
     articles = []
     for item in raw:
-        body = item.get("content") or item.get("summary") or ""
+        # Prefer html_content (full text) > content > summary
+        body = _html_to_text(item.get("html_content")) or item.get("content") or item.get("summary") or ""
         articles.append({
             "id": item.get("id"),
             "title": item.get("title", ""),
