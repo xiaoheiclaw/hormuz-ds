@@ -2,13 +2,14 @@ configs_dir: configs
 
 readwise:
   token: "${READWISE_TOKEN}"
-  sources:
-    - "gCaptain"
-    - "Splash247"
-    - "Al-Monitor"
-    - "Reuters"
-    - "OilPrice.com"
-    - "Iran International"
+  # sources: 不设置 = 拉全部文章，不按来源过滤
+  # sources:
+  #   - "gCaptain"
+  #   - "Splash247"
+  #   - "Al-Monitor"
+  #   - "Reuters"
+  #   - "OilPrice.com"
+  #   - "Iran International"
   proxy: "http://127.0.0.1:7890"
   timeout: 30
 

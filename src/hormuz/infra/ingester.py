@@ -32,8 +32,8 @@ async def fetch_readwise_articles(
     timeout: int = 30,
     limit: int = 50,
 ) -> list[dict]:
-    """Fetch articles from Readwise Reader API, filtered by source site_name."""
-    filter_sources = sources or HORMUZ_SOURCES
+    """Fetch articles from Readwise Reader API, optionally filtered by source site_name."""
+    filter_sources = sources  # None = no filtering, fetch all
     headers = {"Authorization": f"Token {token}"}
     all_docs: list[dict] = []
     cursor: str | None = None
@@ -75,7 +75,7 @@ async def fetch_readwise_articles(
                 break
 
             for doc in results:
-                if doc.get("site_name") in filter_sources:
+                if filter_sources is None or doc.get("site_name") in filter_sources:
                     all_docs.append(doc)
 
             cursor = data.get("nextPageCursor")
