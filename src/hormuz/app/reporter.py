@@ -232,9 +232,15 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
     <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">delta 调节后归一化 + clip [5%, 85%]</div>
     {% if game_signals %}
     <table>
-      <tr><th>信号</th><th>Delta</th></tr>
+      <tr><th>信号</th><th>A</th><th>C</th></tr>
       {% for gs in game_signals %}
-      <tr><td>{{ gs }}</td><td>—</td></tr>
+      <tr>
+        <td>{{ signal_names.get(gs, gs) }}</td>
+        <td class="{{ 'green' if signal_deltas.get(gs, {}).get('a', 0) > 0 else 'red' if signal_deltas.get(gs, {}).get('a', 0) < 0 else 'grey' }}">
+          {{ "%+.0f"|format(signal_deltas.get(gs, {}).get('a', 0) * 100) }}pp</td>
+        <td class="{{ 'red' if signal_deltas.get(gs, {}).get('c', 0) > 0 else 'green' if signal_deltas.get(gs, {}).get('c', 0) < 0 else 'grey' }}">
+          {{ "%+.0f"|format(signal_deltas.get(gs, {}).get('c', 0) * 100) }}pp</td>
+      </tr>
       {% endfor %}
     </table>
     {% else %}
@@ -473,6 +479,22 @@ def render_status(
         # Section 4: signals
         triggered_signals=triggered_signals or [],
         game_signals=game_signals or [],
+        signal_names={
+            "external_mediation": "第三方斡旋",
+            "us_inconsistency": "美国信号矛盾",
+            "costly_self_binding": "高成本自我约束",
+            "irgc_escalation": "IRGC 基础设施升级",
+            "peace_window": "和平窗口",
+            "irgc_fragmentation": "IRGC 内部分裂",
+        },
+        signal_deltas={
+            "external_mediation":  {"a": +0.05, "c": -0.03},
+            "us_inconsistency":    {"a": +0.03, "c":  0.00},
+            "costly_self_binding": {"a": +0.05, "c":  0.00},
+            "irgc_escalation":     {"a": -0.05, "c": +0.10},
+            "peace_window":        {"a": +0.03, "c":  0.00},
+            "irgc_fragmentation":  {"a": +0.02, "c":  0.00},
+        },
         # Section 7: positions
         pos_energy=pos_energy,
         pos_vol=pos_vol,

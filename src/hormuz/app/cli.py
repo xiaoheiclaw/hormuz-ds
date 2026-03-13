@@ -230,14 +230,17 @@ async def _backfill(config_path, days, batch_size):
 
         click.echo(f"  {date_str}: {len(day_articles)} articles...", nl=False)
         try:
-            obs = await extract_observations(
+            extraction = await extract_observations(
                 day_articles, llm=llm, timestamp=ts, batch_size=batch_size,
             )
+            obs = extraction.observations
             if obs:
                 insert_observations(db_path, obs)
                 total_obs += len(obs)
                 ids = sorted(set(o.id for o in obs))
-                click.echo(f" {len(obs)} obs ({', '.join(ids)})")
+                sigs = extraction.signals
+                sig_str = f" + signals: {', '.join(sigs)}" if sigs else ""
+                click.echo(f" {len(obs)} obs ({', '.join(ids)}){sig_str}")
             else:
                 click.echo(" 0 obs")
         except Exception as e:

@@ -23,9 +23,11 @@ async def test_pipeline_full_run(db_path, tmp_path):
         "conflict": {"start_date": "2026-03-01"},
         "output_dir": str(tmp_path),
     }
+    from hormuz.infra.analyzer import ExtractionResult
+    mock_extraction = ExtractionResult(observations=[], signals=[])
     with patch("hormuz.app.pipeline.fetch_readwise_articles", new_callable=AsyncMock, return_value=[]), \
          patch("hormuz.app.pipeline.fetch_market_data", new_callable=AsyncMock, return_value={"brent": 95.0}), \
-         patch("hormuz.app.pipeline.extract_observations", new_callable=AsyncMock, return_value=[]):
+         patch("hormuz.app.pipeline.extract_observations", new_callable=AsyncMock, return_value=mock_extraction):
         result = await run_pipeline(config)
     assert result["steps_completed"] >= 5
     assert "system_output" in result

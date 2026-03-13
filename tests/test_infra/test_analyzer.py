@@ -11,12 +11,14 @@ async def test_extract_observations():
         "observations": [
             {"id": "O01", "value": 3.0, "confidence": "high", "direction": "H1"},
             {"id": "O04", "value": 0.8, "confidence": "high", "direction": "H1"},
-        ]
+        ],
+        "signals": ["external_mediation"],
     }
     articles = [{"title": "CENTCOM update", "summary": "Attack frequency declining", "source": "CENTCOM"}]
-    obs = await extract_observations(articles, llm=mock_llm)
-    assert len(obs) == 2
-    assert obs[0].id == "O01"
+    result = await extract_observations(articles, llm=mock_llm)
+    assert len(result.observations) == 2
+    assert result.observations[0].id == "O01"
+    assert result.signals == ["external_mediation"]
 
 
 def test_llm_factory():

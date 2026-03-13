@@ -1,7 +1,8 @@
-"""Observation analyzer — extract structured observations from articles via LLM."""
+"""Observation analyzer — extract structured observations + Schelling signals from articles via LLM."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from hormuz.core.types import Observation
@@ -9,10 +10,14 @@ from hormuz.infra.llm import LLMBackend
 
 _EXTRACTION_PROMPT = """You are an intelligence analyst for the Hormuz Strait crisis monitoring system.
 
-Extract observations from the following articles. Each observation has a physical meaning —
-give the VALUE that reflects reality, not your hypothesis about which side it supports.
+Extract observations AND Schelling game-theory signals from the following articles.
+Give VALUES that reflect reality, not your hypothesis about which side it supports.
 
-Return JSON only: {"observations": [{"id": "O01", "value": 0.8, "confidence": "high"}, ...]}
+Return JSON only:
+{
+  "observations": [{"id": "O01", "value": 0.8, "confidence": "high"}, ...],
+  "signals": ["external_mediation", "irgc_escalation", ...]
+}
 
 ## A-GROUP: Threat Status (feed ACH engine, 0-1 scale)
 
@@ -92,20 +97,61 @@ O14 — unknown_weapon_type: has an unknown/new weapon type been observed that i
   "foreign-supplied munitions confirmed", "debris analysis reveals unknown origin"
   NOTE: This is rare. Most days should be 0. Only report 1.0 if articles explicitly describe a NEW weapon type.
 
+## SCHELLING SIGNALS (game theory — include in "signals" array if detected)
+
+Only include a signal if articles contain clear evidence. Do NOT fabricate.
+
+external_mediation — Third-party mediation effort detected (Oman, Qatar, China, UN envoy).
+  News phrases: "Omani envoy", "back-channel talks", "Qatar mediation", "diplomatic shuttle",
+  "UN special envoy", "China offered to mediate", "secret negotiations"
+
+us_inconsistency — Contradictory US messaging suggesting internal policy conflict.
+  News phrases: "Pentagon denied State Department claim", "mixed signals from Washington",
+  "internal debate over response", "White House contradicted CENTCOM",
+  "policy rift between hawks and doves"
+
+costly_self_binding — One side makes costly commitment to de-escalation.
+  News phrases: "unilateral ceasefire announced", "withdrew forces as goodwill gesture",
+  "opened humanitarian corridor", "released detained vessels",
+  "suspended enrichment activities", "pulled back naval assets"
+
+irgc_escalation — IRGC escalation against oil infrastructure (cross-layer with E1).
+  News phrases: "oil terminal attacked", "pipeline sabotaged", "Ras Tanura struck",
+  "Fujairah port hit", "infrastructure targeted", "storage facility ablaze",
+  "IRGC claims attack on Saudi oil facility"
+
+peace_window — Diplomatic window opening (only valid if mediation + self-binding both present).
+  News phrases: "framework agreement", "terms proposed and accepted", "ceasefire roadmap",
+  "both sides agreed to talks", "peace conference announced"
+  NOTE: Only include if BOTH mediation and self-binding evidence exist in same news cycle.
+
+irgc_fragmentation — Signs of IRGC internal disagreement.
+  News phrases: "IRGC commander defected", "internal power struggle", "Quds Force vs Navy dispute",
+  "hardliners vs pragmatists split", "reports of insubordination", "IRGC leadership shake-up"
+  NOTE: Only include if US inconsistency also present (validates interpretation).
+
 ## RULES
 - Only extract observations you can infer from the articles. Do not fabricate.
 - Give confidence: "high" (explicit numbers/quotes), "medium" (reasonable inference), "low" (vague mention).
 - O01-O06, O08, O10, O11, O14: stay within [0, 1].
 - O07: percentage points. O09: WS points. O12: $/mt. O13: mbd.
+- signals: array of string keys. Empty array if no signals detected. Most days will be empty.
 """
+
+
+@dataclass
+class ExtractionResult:
+    """Combined extraction output: observations + Schelling signals."""
+    observations: list[Observation] = field(default_factory=list)
+    signals: list[str] = field(default_factory=list)
 
 
 async def _extract_batch(
     articles: list[dict],
     llm: LLMBackend,
     ts: datetime,
-) -> list[Observation]:
-    """Extract observations from a single batch of articles."""
+) -> tuple[list[Observation], list[str]]:
+    """Extract observations and signals from a single batch of articles."""
     text_parts = []
     for a in articles:
         text_parts.append(f"[{a.get('source', 'unknown')}] {a.get('title', '')}\n{a.get('summary', '')}")
@@ -121,7 +167,18 @@ async def _extract_batch(
             value=float(item["value"]),
             source=f"llm:{item.get('confidence', 'unknown')}",
         ))
-    return observations
+
+    signals = result.get("signals", [])
+    if not isinstance(signals, list):
+        signals = []
+    # Validate signal keys
+    valid_signals = {
+        "external_mediation", "us_inconsistency", "costly_self_binding",
+        "irgc_escalation", "peace_window", "irgc_fragmentation",
+    }
+    signals = [s for s in signals if s in valid_signals]
+
+    return observations, signals
 
 
 async def extract_observations(
@@ -129,30 +186,33 @@ async def extract_observations(
     llm: LLMBackend,
     timestamp: datetime | None = None,
     batch_size: int = 5,
-) -> list[Observation]:
-    """Extract O01-O13 observations from articles in batches.
+) -> ExtractionResult:
+    """Extract O01-O14 observations + Schelling signals from articles in batches.
 
     Processes articles in batches of batch_size, merges results,
     and keeps the highest-confidence observation per ID.
+    Returns ExtractionResult with both observations and signals.
     """
     if not articles:
-        return []
+        return ExtractionResult()
 
     ts = timestamp or datetime.now()
 
     # Process in batches
     all_obs: list[Observation] = []
+    all_signals: list[str] = []
     for i in range(0, len(articles), batch_size):
         batch = articles[i : i + batch_size]
         try:
-            batch_obs = await _extract_batch(batch, llm, ts)
+            batch_obs, batch_sigs = await _extract_batch(batch, llm, ts)
             all_obs.extend(batch_obs)
+            all_signals.extend(batch_sigs)
         except Exception:
             continue  # skip failed batch
 
-    # Deduplicate: keep highest-confidence per obs ID
+    # Deduplicate observations: keep highest-confidence per obs ID
     _conf_rank = {"high": 3, "medium": 2, "low": 1, "unknown": 0}
-    best: dict[str, Observation] = {}
+    best: dict[str, tuple[Observation, int]] = {}
     for o in all_obs:
         conf = o.source.split(":")[-1] if ":" in o.source else "unknown"
         rank = _conf_rank.get(conf, 0)
@@ -161,4 +221,10 @@ async def extract_observations(
         elif rank > best[o.id][1]:
             best[o.id] = (o, rank)
 
-    return [obs for obs, _ in best.values()]
+    # Deduplicate signals
+    unique_signals = list(dict.fromkeys(all_signals))
+
+    return ExtractionResult(
+        observations=[obs for obs, _ in best.values()],
+        signals=unique_signals,
+    )

@@ -40,10 +40,11 @@ def engine_run(
     mc_n: int = 10000,
     seed: int | None = None,
     o01_trend: str = "stable",
+    schelling_signals: list[str] | None = None,
 ) -> tuple[SystemOutput, MCResult]:
     """Pure compute chain: M1 → M2 → M3 → M4 → M5 → MC.
 
-    No IO, no side effects. Returns SystemOutput.
+    No IO, no side effects. Returns (SystemOutput, MCResult).
     """
     # M1: ACH Bayesian inference
     posterior = run_ach(
@@ -87,10 +88,13 @@ def engine_run(
 
     # M5: Game theory path adjustment
     # Base weights from MC physical simulation, then game signals adjust
+    # Sources: 1) controls table (manual), 2) LLM-extracted Schelling signals
     game_signals = []
     for ctrl in controls:
         if ctrl.triggered and ctrl.effect:
             game_signals.append(ctrl.effect)
+    if schelling_signals:
+        game_signals.extend(schelling_signals)
     mc_base = PathWeights(
         a=mc_result.path_frequencies["A"],
         b=mc_result.path_frequencies["B"],
@@ -184,7 +188,8 @@ async def run_pipeline(config: dict) -> dict:
         articles, market = [], {}
         result["steps_completed"] += 1
 
-    # Step 2: LLM observation extraction
+    # Step 2: LLM observation + Schelling signal extraction
+    llm_signals: list[str] = []
     try:
         from hormuz.infra.llm import create_llm_backend
         llm_config = config.get("llm", {})
@@ -192,7 +197,9 @@ async def run_pipeline(config: dict) -> dict:
         backend_kwargs = llm_config.get(backend_type, {})
         llm = create_llm_backend(backend_type, **backend_kwargs)
         parsed = parse_readwise_articles(articles)[:30]
-        llm_obs = await extract_observations(parsed, llm=llm, batch_size=5)
+        extraction = await extract_observations(parsed, llm=llm, batch_size=5)
+        llm_obs = extraction.observations
+        llm_signals = extraction.signals
         result["steps_completed"] += 1
     except Exception as e:
         result["errors"].append(f"Step 2 LLM: {e}")
@@ -277,7 +284,9 @@ async def run_pipeline(config: dict) -> dict:
             mc_n=config.get("mc", {}).get("n", 10000),
             seed=config.get("mc", {}).get("seed", 42),
             o01_trend=o01_trend,
+            schelling_signals=llm_signals,
         )
+        result["schelling_signals"] = llm_signals
         so.confidence_level = confidence
         if confidence == "burn_in":
             so.consistency_flags.append("BURN-IN: <3 days history, output unreliable")
@@ -303,8 +312,8 @@ async def run_pipeline(config: dict) -> dict:
         from hormuz.app.reporter import render_status
         report_path = Path(config.get("report_output", "docs/index.html"))
         triggered_sigs = signal_result.triggered if signal_result else []
-        game_sigs = signal_result.position_actions if signal_result else []
-        game_sig_descs = [s.get("desc", str(s)) for s in game_sigs] if game_sigs else []
+        # Schelling signals for display (LLM-extracted + manual controls)
+        schelling_descs = llm_signals[:]  # already string keys
         render_status(
             system_output=so,
             mc_result=mc_result,
@@ -314,7 +323,7 @@ async def run_pipeline(config: dict) -> dict:
             conflict_start=config.get("conflict", {}).get("start_date", "2026-03-01"),
             position_result=result.get("positions"),
             triggered_signals=triggered_sigs,
-            game_signals=game_sig_descs,
+            game_signals=schelling_descs,
             mc_n=config.get("mc", {}).get("n", 10000),
         )
         result["report_path"] = str(report_path)
