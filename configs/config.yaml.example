@@ -1,6 +1,7 @@
+configs_dir: configs
+
 readwise:
   token: "${READWISE_TOKEN}"
-  tag: "geopulse"
   sources:
     - "gCaptain"
     - "Splash247"
@@ -14,15 +15,26 @@ readwise:
 llm:
   backend: "claude_api"
   openclaw:
-    endpoint: "${OPENCLAW_ENDPOINT}"
+    endpoint: "http://localhost:8080"
   claude_api:
-    model: "claude-sonnet-4-6"
+    model: "claude-sonnet-4-5-20250929"
+    api_key: "${CLAUDE_API_KEY}"
+    base_url: "${CLAUDE_BASE_URL}"
+    proxy: "http://127.0.0.1:7890"
+
+# Optional: EIA API for SPR data (O13)
+# eia:
+#   api_key: "${EIA_API_KEY}"
 
 conflict:
   start_date: "2026-03-01"
 
 update:
   interval_hours: 4
+
+mc:
+  n: 10000
+  seed: 42
 
 db:
   path: "data/hormuz.db"

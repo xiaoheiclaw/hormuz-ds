@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from hormuz.core.types import ACHPosterior, Parameters
-from hormuz.core.m2_duration import estimate_t1, estimate_t2, compute_percentiles
+from hormuz.core.m2_duration import estimate_t_total, compute_percentiles
 from hormuz.core.m3_buffer import compute_buffer_trajectory
 from hormuz.core.m4_gap import integrate_total_gap
 
@@ -60,14 +60,9 @@ def run_monte_carlo(
     """
     rng = np.random.default_rng(seed)
 
-    # Sample T1 and T2 arrays
-    t1_seed = int(rng.integers(0, 2**31))
-    t2_seed = int(rng.integers(0, 2**31))
-    t1_samples = estimate_t1(posterior, n=n, seed=t1_seed)
-    t2_samples = estimate_t2(params, events=events, n=n, seed=t2_seed)
-    deployment_gap = rng.uniform(7, 14, n)
-
-    t_total = t1_samples + deployment_gap + t2_samples
+    # Sample T_total via M2 (includes regime jumps)
+    mc_seed = int(rng.integers(0, 2**31))
+    _, _, t_total = estimate_t_total(posterior, params, events, n=n, seed=mc_seed)
 
     # Pre-compute buffer trajectory up to max possible T
     max_t = int(np.ceil(np.max(t_total))) + 1

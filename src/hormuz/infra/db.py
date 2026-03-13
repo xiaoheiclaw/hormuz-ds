@@ -103,6 +103,17 @@ def insert_observation(path: Path, obs: Observation) -> None:
     conn.close()
 
 
+def insert_observations(path: Path, obs_list: list[Observation]) -> None:
+    """Batch insert observations."""
+    conn = sqlite3.connect(path)
+    conn.executemany(
+        "INSERT INTO observations (id, timestamp, value, source, noise_note) VALUES (?, ?, ?, ?, ?)",
+        [(o.id, o.timestamp.isoformat(), o.value, o.source, o.noise_note) for o in obs_list],
+    )
+    conn.commit()
+    conn.close()
+
+
 def get_observations(path: Path, since: datetime | None = None) -> list[Observation]:
     conn = sqlite3.connect(path)
     if since:
@@ -123,6 +134,111 @@ def get_observations(path: Path, since: datetime | None = None) -> list[Observat
         )
         for r in rows
     ]
+
+
+def compute_o02_from_history(path: Path, lookback_days: int = 7) -> Observation | None:
+    """Compute O02 (attack trend change) from recent O01 history.
+
+    Compares average O01 in recent half vs older half of lookback window.
+    Returns None if insufficient data (<2 O01 records).
+    """
+    from datetime import timedelta
+    cutoff = datetime.now() - timedelta(days=lookback_days)
+    o01_records = [
+        o for o in get_observations(path, since=cutoff)
+        if o.id == "O01"
+    ]
+    if len(o01_records) < 2:
+        return None
+
+    o01_records.sort(key=lambda o: o.timestamp)
+    mid = len(o01_records) // 2
+    older_avg = sum(o.value for o in o01_records[:mid]) / mid
+    recent_avg = sum(o.value for o in o01_records[mid:]) / (len(o01_records) - mid)
+
+    # O02: 0=rising, 0.5=stable, 1.0=sharp decline
+    # If recent < older → declining → high O02
+    if older_avg == 0:
+        change = 0.5
+    else:
+        ratio = (older_avg - recent_avg) / older_avg  # positive = decline
+        change = max(0.0, min(1.0, 0.5 + ratio))  # map [-1,1] → [0,1] centered at 0.5
+
+    return Observation(
+        id="O02",
+        timestamp=datetime.now(),
+        value=round(change, 2),
+        source="db:computed",
+    )
+
+
+def compute_o01_rolling(path: Path, window_days: int = 7) -> float | None:
+    """Compute O01 7-day rolling average from DB history.
+
+    Returns None if no O01 records in window.
+    """
+    from datetime import timedelta
+    cutoff = datetime.now() - timedelta(days=window_days)
+    o01_records = [
+        o for o in get_observations(path, since=cutoff)
+        if o.id == "O01"
+    ]
+    if not o01_records:
+        return None
+    return sum(o.value for o in o01_records) / len(o01_records)
+
+
+def compute_o01_trend(path: Path, window_days: int = 7) -> str:
+    """Determine O01 trend direction from DB history.
+
+    Returns "rising", "falling", or "stable".
+    Used for T1a/T1b unbinding (GPS spoofing interpretation).
+    """
+    from datetime import timedelta
+    cutoff = datetime.now() - timedelta(days=window_days)
+    o01_records = [
+        o for o in get_observations(path, since=cutoff)
+        if o.id == "O01"
+    ]
+    if len(o01_records) < 2:
+        return "stable"
+
+    o01_records.sort(key=lambda o: o.timestamp)
+    mid = len(o01_records) // 2
+    older_avg = sum(o.value for o in o01_records[:mid]) / mid
+    recent_avg = sum(o.value for o in o01_records[mid:]) / (len(o01_records) - mid)
+
+    diff = recent_avg - older_avg
+    if diff > 0.05:
+        return "rising"
+    elif diff < -0.05:
+        return "falling"
+    return "stable"
+
+
+def get_history_days(path: Path) -> int:
+    """Count distinct days with observations in DB."""
+    conn = sqlite3.connect(path)
+    row = conn.execute(
+        "SELECT COUNT(DISTINCT date(timestamp)) FROM observations"
+    ).fetchone()
+    conn.close()
+    return row[0] if row else 0
+
+
+def compute_confidence_level(path: Path) -> str:
+    """Determine system confidence based on DB history depth.
+
+    <3 days: burn_in (output unreliable, don't act on it)
+    3-7 days: low (directional but noisy)
+    >7 days: normal
+    """
+    days = get_history_days(path)
+    if days < 3:
+        return "burn_in"
+    elif days <= 7:
+        return "low"
+    return "normal"
 
 
 # ── Controls ──────────────────────────────────────────────────────────

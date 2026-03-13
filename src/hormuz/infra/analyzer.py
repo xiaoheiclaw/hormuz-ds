@@ -9,43 +9,103 @@ from hormuz.infra.llm import LLMBackend
 
 _EXTRACTION_PROMPT = """You are an intelligence analyst for the Hormuz Strait crisis monitoring system.
 
-Extract observations from the following articles. For each observation, provide:
-- id: one of O01-O13 (attack frequency, coordination, ammo substitution, GPS spoofing, etc.)
-- value: numeric value (0-1 scale for qualitative, actual value for quantitative)
-- confidence: "high", "medium", or "low"
-- direction: "H1" (depletion) or "H2" (preservation)
+Extract observations from the following articles. Each observation has a physical meaning —
+give the VALUE that reflects reality, not your hypothesis about which side it supports.
 
-Return JSON: {"observations": [{"id": "O01", "value": 3.0, "confidence": "high", "direction": "H1"}, ...]}
+Return JSON only: {"observations": [{"id": "O01", "value": 0.8, "confidence": "high"}, ...]}
 
-Observation IDs:
-- O01: attack_frequency (attacks per day)
-- O02: attack_frequency_2nd_derivative (acceleration of decline)
-- O03: attack_coordination (0-1, degrading=H1, maintains sync=H2)
-- O04: ammo_substitution_ratio (0-1, high-end extinct=H1, retains=H2)
-- O05: gps_spoofing_complexity (0-1, degrades=H1, maintains=H2)
-- O06: mosaic_fragmentation (0-1, isolated=H1, multi-node=H2)
-- O07: ap_premium_pct (insurance premium percentage)
-- O08: pni_status (P&I club status indicator)
-- O09: vlcc_td3_rate (freight rate)
-- O10: strait_daily_transit (daily vessel count)
-- O11: yanbu_ais_loading (pipeline flow indicator)
-- O12: fujairah_sg_spread (fuel oil spread)
-- O13: spr_actual_release (DOE weekly report mbd)
+## A-GROUP: Threat Status (feed ACH engine, 0-1 scale)
+
+O01 — attack_frequency: IRGC attacks on strait shipping in past 24h.
+  0=no attacks, 0.3=sporadic (1/day), 0.5=moderate (2/day), 0.8=heavy (4+/day), 1.0=saturated
+  News phrases: "CENTCOM reported X attacks", "no incidents reported", "surge in attacks"
+
+O02 — attack_trend_change: are attacks rising, stable, or declining vs recent days?
+  0=sharp rise/new escalation, 0.5=stable/no change, 1.0=sharp decline
+  News phrases: "attacks dropped 50%", "lull in hostilities", "3 days without incident",
+  "renewed wave of attacks", "escalation in frequency"
+
+O03 — attack_coordination: tactical complexity of today's attacks.
+  0=single boat/blind fire/amateur, 0.5=some coordination, 1.0=multi-platform synchronized swarm
+  News phrases: "coordinated multi-axis attack", "simultaneous strikes from multiple directions",
+  "isolated lone-wolf attack", "sophisticated swarming tactics"
+
+O04 — advanced_weapon_use: ratio of high-end weapons (ASCM/ASBM/cruise missiles) vs low-end (drones/FIAC/unguided).
+  0=only crude/cheap weapons, 0.5=mixed, 1.0=exclusively advanced missiles
+  News phrases: "anti-ship missile fired", "only suicide drones used", "cruise missile intercepted",
+  "no high-end munitions observed", "switched to cheap UAVs"
+
+O05 — gps_spoofing_complexity: electronic warfare sophistication in strait waters.
+  0=no EW activity, 0.3=basic jamming, 0.7=complex geometric spoofing, 1.0=advanced multi-frequency
+  News phrases: "GPS spoofing cluster detected", "AIS anomalies", "phantom vessel tracks",
+  "electronic warfare activity ceased", "jamming signals reported"
+
+O06 — network_fragmentation: geographic distribution of IRGC launch sites.
+  0=collapsed to few inland sites, 0.5=partial fragmentation, 1.0=distributed coastal multi-node network
+  News phrases: "attacks only from mountain positions", "coastal launch sites destroyed",
+  "multiple firing positions along coastline", "dispersed mobile launchers"
+
+## B-GROUP: Blockade/Recovery (0-1 scale except O07, O09)
+
+O07 — war_risk_insurance_premium: hull war risk additional premium as % of vessel value.
+  Give actual percentage (e.g., 2.5 = 2.5%). Normal peacetime <0.1%, crisis 1-5%.
+  News phrases: "war risk premium surged to X%", "insurance costs soared", "AP quoted at X%",
+  "hull war risk", "underwriters raised rates"
+
+O08 — pni_exclusion: P&I club war risk coverage status.
+  0=normal coverage, 0.3=surcharges added, 0.7=72h cancellation notice triggered, 1.0=full exclusion/per-voyage only
+  News phrases: "P&I clubs withdrew coverage", "war risk exclusion", "per-voyage approval only",
+  "insurance restored to normal", "clubs reinstated coverage"
+
+O09 — vlcc_freight_rate: VLCC spot rate on TD3 route (Middle East→Far East), Worldscale points.
+  Give WS number (e.g., 250). Normal 40-80, crisis 200-500+.
+  News phrases: "VLCC rates hit WS400", "tanker rates surged", "freight market frozen",
+  "no fixtures reported", "rates returning to normal"
+
+O10 — strait_daily_transit: commercial vessel traffic through Hormuz.
+  0=zero transits (full blockade), 0.5=heavily reduced (~30 ships), 1.0=normal (~60+ ships/day)
+  News phrases: "only X vessels transited", "shipping traffic resumed", "strait effectively closed",
+  "AIS shows near-zero traffic", "convoy of X ships passed through"
+
+## C-GROUP: Buffer Arrival (verify alternative supply)
+
+O11 — yanbu_ais_loading: Saudi Yanbu port crude loading activity (pipeline diversion proxy).
+  0=no loading activity, 0.5=partial operations, 1.0=full capacity loading
+  News phrases: "Yanbu loadings increased", "tankers queuing at Yanbu", "Red Sea exports surging",
+  "Saudi East-West pipeline at capacity", "Yanbu terminal operating normally"
+
+O12 — fujairah_singapore_spread: fuel oil price spread between Fujairah and Singapore ($/mt).
+  Give actual spread value. Normal <$20, crisis >$100 signals logistics breakdown.
+  News phrases: "Fujairah premium surged", "fuel oil spread widened to $X",
+  "Fujairah storage hub disrupted", "bunkering prices spiked"
+
+O13 — spr_release_rate: actual SPR release rate in million barrels/day.
+  Give mbd value (e.g., 1.5). Zero until release order + 13-day pump delay.
+  News phrases: "DOE released X million barrels", "SPR drawdown of X mbd",
+  "strategic reserve release authorized", "emergency oil release"
+
+## A6: H3 UNFREEZE MONITOR
+
+O14 — unknown_weapon_type: has an unknown/new weapon type been observed that is NOT in IRGC's known inventory?
+  0=no unknown weapons (normal), 1.0=confirmed new weapon type (e.g., Russian-origin missile not previously seen)
+  News phrases: "previously unseen weapon", "new missile type identified", "weapon not in known Iranian arsenal",
+  "foreign-supplied munitions confirmed", "debris analysis reveals unknown origin"
+  NOTE: This is rare. Most days should be 0. Only report 1.0 if articles explicitly describe a NEW weapon type.
+
+## RULES
+- Only extract observations you can infer from the articles. Do not fabricate.
+- Give confidence: "high" (explicit numbers/quotes), "medium" (reasonable inference), "low" (vague mention).
+- O01-O06, O08, O10, O11, O14: stay within [0, 1].
+- O07: percentage points. O09: WS points. O12: $/mt. O13: mbd.
 """
 
 
-async def extract_observations(
+async def _extract_batch(
     articles: list[dict],
     llm: LLMBackend,
-    timestamp: datetime | None = None,
+    ts: datetime,
 ) -> list[Observation]:
-    """Extract O01-O13 observations from articles using LLM."""
-    if not articles:
-        return []
-
-    ts = timestamp or datetime.now()
-
-    # Build text from articles
+    """Extract observations from a single batch of articles."""
     text_parts = []
     for a in articles:
         text_parts.append(f"[{a.get('source', 'unknown')}] {a.get('title', '')}\n{a.get('summary', '')}")
@@ -60,7 +120,45 @@ async def extract_observations(
             timestamp=ts,
             value=float(item["value"]),
             source=f"llm:{item.get('confidence', 'unknown')}",
-            noise_note=item.get("direction"),
         ))
-
     return observations
+
+
+async def extract_observations(
+    articles: list[dict],
+    llm: LLMBackend,
+    timestamp: datetime | None = None,
+    batch_size: int = 5,
+) -> list[Observation]:
+    """Extract O01-O13 observations from articles in batches.
+
+    Processes articles in batches of batch_size, merges results,
+    and keeps the highest-confidence observation per ID.
+    """
+    if not articles:
+        return []
+
+    ts = timestamp or datetime.now()
+
+    # Process in batches
+    all_obs: list[Observation] = []
+    for i in range(0, len(articles), batch_size):
+        batch = articles[i : i + batch_size]
+        try:
+            batch_obs = await _extract_batch(batch, llm, ts)
+            all_obs.extend(batch_obs)
+        except Exception:
+            continue  # skip failed batch
+
+    # Deduplicate: keep highest-confidence per obs ID
+    _conf_rank = {"high": 3, "medium": 2, "low": 1, "unknown": 0}
+    best: dict[str, Observation] = {}
+    for o in all_obs:
+        conf = o.source.split(":")[-1] if ":" in o.source else "unknown"
+        rank = _conf_rank.get(conf, 0)
+        if o.id not in best:
+            best[o.id] = (o, rank)
+        elif rank > best[o.id][1]:
+            best[o.id] = (o, rank)
+
+    return [obs for obs, _ in best.values()]

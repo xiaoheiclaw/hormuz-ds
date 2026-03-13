@@ -155,3 +155,4 @@ class SystemOutput(BaseModel):
     path_total_gaps: dict[str, float]
     expected_total_gap: float
     consistency_flags: list[str]
+    confidence_level: str = "normal"  # "burn_in" (<3d) / "low" (3-7d) / "normal" (>7d)

@@ -3,19 +3,36 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from pathlib import Path
 
 import click
 import yaml
 
 
+def _project_root() -> Path:
+    """Resolve project root (contains pyproject.toml)."""
+    p = Path(__file__).resolve()
+    for parent in p.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    return Path.cwd()
+
+
 def _load_config(config_path: Path | None = None) -> dict:
-    """Load config from YAML file."""
+    """Load config from YAML file, inject resolved paths."""
+    root = _project_root()
     if config_path is None:
-        config_path = Path(__file__).parents[2] / "configs" / "config.yaml"
+        config_path = root / "configs" / "config.yaml"
     if config_path.exists():
-        return yaml.safe_load(config_path.read_text()) or {}
-    return {}
+        cfg = yaml.safe_load(config_path.read_text()) or {}
+    else:
+        cfg = {}
+    # Resolve configs_dir and db.path relative to project root
+    cfg["configs_dir"] = str(root / cfg.get("configs_dir", "configs"))
+    if "db" in cfg:
+        cfg["db"]["path"] = str(root / cfg["db"]["path"])
+    return cfg
 
 
 @click.group()
@@ -48,6 +65,8 @@ def run(config_path, mc_n, seed):
             click.echo(f"  ⚠ {e}", err=True)
     if "system_output" in result:
         so = result["system_output"]
+        if so.confidence_level != "normal":
+            click.echo(f"  Confidence: {so.confidence_level.upper()}")
         click.echo(f"  GrossGap: {so.gross_gap_mbd:.1f} mbd")
         click.echo(f"  ACH: H1={so.ach_posterior.h1:.2f} H2={so.ach_posterior.h2:.2f}")
         click.echo(f"  Paths: A={so.path_probabilities.a:.0%} B={so.path_probabilities.b:.0%} C={so.path_probabilities.c:.0%}")
@@ -139,6 +158,92 @@ def override(db_path, param, new_value):
 
     save_parameter_override(db_path, param=param, old_value="(see DB)", new_value=new_value)
     click.echo(f"Parameter override logged: {param} → {new_value}")
+
+
+@cli.command()
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), default=None)
+@click.option("--days", default=7, help="Number of days to backfill")
+@click.option("--batch-size", default=5, help="Articles per LLM batch")
+def backfill(config_path, days, batch_size):
+    """Backfill observations from historical Readwise articles.
+
+    Fetches articles from the past N days, groups by date,
+    runs LLM extraction per day, and inserts into DB with correct timestamps.
+    This builds the historical baseline needed for O01 trend, O02 computation, etc.
+    """
+    asyncio.run(_backfill(config_path, days, batch_size))
+
+
+async def _backfill(config_path, days, batch_size):
+    from datetime import timedelta
+    from collections import defaultdict
+    from hormuz.infra.ingester import fetch_readwise_articles, parse_readwise_articles
+    from hormuz.infra.analyzer import extract_observations
+    from hormuz.infra.llm import create_llm_backend
+    from hormuz.infra.db import init_db, insert_observations
+
+    config = _load_config(config_path)
+    db_path = Path(config["db"]["path"])
+    init_db(db_path)
+
+    rw = config["readwise"]
+    sources = set(rw["sources"]) if "sources" in rw else None
+    cutoff = datetime.now() - timedelta(days=days)
+
+    click.echo(f"Fetching articles from past {days} days...")
+    articles = await fetch_readwise_articles(
+        token=rw["token"],
+        sources=sources,
+        proxy=rw.get("proxy"),
+        timeout=rw.get("timeout", 30),
+        limit=200,
+    )
+
+    # Filter to articles within date range and group by date
+    parsed = parse_readwise_articles(articles)
+    by_date: dict[str, list[dict]] = defaultdict(list)
+    for a in parsed:
+        pub = a.get("published_date") or ""
+        if pub >= cutoff.strftime("%Y-%m-%d"):
+            date_key = pub[:10] if pub else "unknown"
+            by_date[date_key].append(a)
+
+    if not by_date:
+        click.echo("No articles found in date range.")
+        return
+
+    click.echo(f"Found {sum(len(v) for v in by_date.values())} articles across {len(by_date)} days")
+
+    # LLM setup
+    llm_config = config.get("llm", {})
+    backend_type = llm_config.get("backend", "claude_api")
+    backend_kwargs = llm_config.get(backend_type, {})
+    llm = create_llm_backend(backend_type, **backend_kwargs)
+
+    total_obs = 0
+    for date_str in sorted(by_date.keys()):
+        day_articles = by_date[date_str][:30]
+        try:
+            ts = datetime.fromisoformat(date_str + "T12:00:00")
+        except ValueError:
+            continue
+
+        click.echo(f"  {date_str}: {len(day_articles)} articles...", nl=False)
+        try:
+            obs = await extract_observations(
+                day_articles, llm=llm, timestamp=ts, batch_size=batch_size,
+            )
+            if obs:
+                insert_observations(db_path, obs)
+                total_obs += len(obs)
+                ids = sorted(set(o.id for o in obs))
+                click.echo(f" {len(obs)} obs ({', '.join(ids)})")
+            else:
+                click.echo(" 0 obs")
+        except Exception as e:
+            click.echo(f" error: {e}")
+
+    click.echo(f"Backfill complete: {total_obs} observations inserted across {len(by_date)} days")
 
 
 @cli.command()

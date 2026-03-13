@@ -40,6 +40,6 @@ def test_engine_run_pure():
     params = Parameters()
     observations = []
     controls = []
-    so = engine_run(constants, params, observations, controls, events={}, mc_n=100, seed=42)
+    so, _mc = engine_run(constants, params, observations, controls, events={}, mc_n=100, seed=42)
     assert so.gross_gap_mbd == pytest.approx(16.0, abs=0.2)
     assert so.path_probabilities.a + so.path_probabilities.b + so.path_probabilities.c == pytest.approx(1.0)

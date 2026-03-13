@@ -24,10 +24,10 @@ from hormuz.core.m2_duration import estimate_t_total, compute_percentiles
 from hormuz.core.m3_buffer import compute_buffer_trajectory
 from hormuz.core.m4_gap import compute_gross_gap, compute_net_gap_trajectory, integrate_total_gap
 from hormuz.core.m5_game import adjust_path_weights
-from hormuz.core.mc import run_monte_carlo
+from hormuz.core.mc import MCResult, run_monte_carlo
 
 # These are imported for run_pipeline but may be mocked in tests
-from hormuz.infra.ingester import fetch_readwise_articles, fetch_market_data, market_data_to_observations
+from hormuz.infra.ingester import fetch_readwise_articles, fetch_market_data, fetch_spr_release, fetch_bunker_spread, get_calibration_data, bwet_to_vlcc_obs, parse_readwise_articles
 from hormuz.infra.analyzer import extract_observations
 
 
@@ -39,13 +39,17 @@ def engine_run(
     events: dict[str, bool],
     mc_n: int = 10000,
     seed: int | None = None,
-) -> SystemOutput:
+    o01_trend: str = "stable",
+) -> tuple[SystemOutput, MCResult]:
     """Pure compute chain: M1 → M2 → M3 → M4 → M5 → MC.
 
     No IO, no side effects. Returns SystemOutput.
     """
     # M1: ACH Bayesian inference
-    posterior = run_ach(observations, h3_suspended=params.h3_suspended, h3_prior=params.h3_prior)
+    posterior = run_ach(
+        observations, h3_suspended=params.h3_suspended,
+        h3_prior=params.h3_prior, o01_trend=o01_trend,
+    )
 
     # M2: T distribution
     t1_samples, t2_samples, t_total_samples = estimate_t_total(
@@ -78,16 +82,21 @@ def engine_run(
             (d, ng) for d, ng in net_gap_traj if d <= t_end
         ]
 
+    # MC simulation (before M5, because MC path frequencies become base weights)
+    mc_result = run_monte_carlo(posterior, params, events, n=mc_n, seed=seed)
+
     # M5: Game theory path adjustment
-    # Extract active game signals from controls
+    # Base weights from MC physical simulation, then game signals adjust
     game_signals = []
     for ctrl in controls:
         if ctrl.triggered and ctrl.effect:
             game_signals.append(ctrl.effect)
-    path_probs = adjust_path_weights(PathWeights(), active_signals=game_signals)
-
-    # MC simulation
-    mc_result = run_monte_carlo(posterior, params, events, n=mc_n, seed=seed)
+    mc_base = PathWeights(
+        a=mc_result.path_frequencies["A"],
+        b=mc_result.path_frequencies["B"],
+        c=mc_result.path_frequencies["C"],
+    )
+    path_probs = adjust_path_weights(mc_base, active_signals=game_signals)
 
     # Expected total gap
     expected_gap = (
@@ -99,7 +108,7 @@ def engine_run(
     # Consistency flags
     flags = _check_consistency(posterior, params, gross_gap)
 
-    return SystemOutput(
+    so = SystemOutput(
         timestamp=datetime.now(),
         ach_posterior=posterior,
         t1_percentiles=t1_pct,
@@ -113,6 +122,7 @@ def engine_run(
         expected_total_gap=expected_gap,
         consistency_flags=flags,
     )
+    return so, mc_result
 
 
 def _check_consistency(
@@ -145,6 +155,10 @@ async def run_pipeline(config: dict) -> dict:
         save_system_output,
         get_observations,
         get_controls,
+        insert_observations,
+        compute_o02_from_history,
+        compute_o01_trend,
+        compute_confidence_level,
     )
     from hormuz.app.signals import scan_signals
     from hormuz.app.positions import evaluate_positions
@@ -155,11 +169,13 @@ async def run_pipeline(config: dict) -> dict:
 
     # Step 1: Fetch data
     try:
+        rw = config["readwise"]
+        sources = set(rw["sources"]) if "sources" in rw else None
         articles = await fetch_readwise_articles(
-            token=config["readwise"]["token"],
-            tag=config["readwise"].get("tag", "hormuz"),
-            proxy=config["readwise"].get("proxy"),
-            timeout=config["readwise"].get("timeout", 30),
+            token=rw["token"],
+            sources=sources,
+            proxy=rw.get("proxy"),
+            timeout=rw.get("timeout", 30),
         )
         market = await fetch_market_data(proxy=config["readwise"].get("proxy"))
         result["steps_completed"] += 1
@@ -175,34 +191,96 @@ async def run_pipeline(config: dict) -> dict:
         backend_type = llm_config.get("backend", "claude_api")
         backend_kwargs = llm_config.get(backend_type, {})
         llm = create_llm_backend(backend_type, **backend_kwargs)
-        llm_obs = await extract_observations(articles, llm=llm)
+        parsed = parse_readwise_articles(articles)[:30]
+        llm_obs = await extract_observations(parsed, llm=llm, batch_size=5)
         result["steps_completed"] += 1
     except Exception as e:
         result["errors"].append(f"Step 2 LLM: {e}")
         llm_obs = []
         result["steps_completed"] += 1
 
-    # Add market observations
-    brent_price = market.get("brent", 95.0)
-    market_obs = market_data_to_observations(market, timestamp=datetime.now())
-    all_obs = llm_obs + market_obs
+    # Calibration data (Brent/OVX — not O-series, used for consistency checks)
+    calib = get_calibration_data(market)
+    brent_price = calib.get("brent_price", 95.0)
+    all_obs = llm_obs  # O-series comes only from LLM extraction now
+
+    # BWET → O09 (VLCC freight proxy) — yfinance, free
+    vlcc_obs = bwet_to_vlcc_obs(market, timestamp=datetime.now())
+    if vlcc_obs:
+        all_obs = [o for o in all_obs if o.id != "O09"] + [vlcc_obs]
+
+    # Ship & Bunker → O12 (Fujairah-Singapore spread) — web scrape, free
+    try:
+        bunker_obs = await fetch_bunker_spread(
+            proxy=config["readwise"].get("proxy"),
+        )
+        if bunker_obs:
+            all_obs = [o for o in all_obs if o.id != "O12"] + [bunker_obs]
+    except Exception as e:
+        result["errors"].append(f"Bunker spread fetch: {e}")
+
+    # EIA SPR data (O13) — public API, if key configured
+    eia_key = config.get("eia", {}).get("api_key")
+    if eia_key:
+        try:
+            spr_obs = await fetch_spr_release(
+                eia_key, proxy=config["readwise"].get("proxy"),
+            )
+            if spr_obs:
+                all_obs = [o for o in all_obs if o.id != "O13"] + [spr_obs]
+        except Exception as e:
+            result["errors"].append(f"EIA SPR fetch: {e}")
+
+    # Persist observations to DB
+    if all_obs:
+        try:
+            insert_observations(db_path, all_obs)
+        except Exception as e:
+            result["errors"].append(f"DB insert obs: {e}")
+
+    # Compute O02 from historical O01 (replaces LLM's O02)
+    try:
+        computed_o02 = compute_o02_from_history(db_path)
+        if computed_o02 is not None:
+            all_obs = [o for o in all_obs if o.id != "O02"] + [computed_o02]
+    except Exception:
+        pass  # Fall back to LLM's O02 if any
+
+    # Compute O01 trend from DB history (for T1a/T1b and signal scan)
+    o01_trend = compute_o01_trend(db_path)
 
     # Step 3: Signal scan (穿透, before ACH)
     try:
-        signal_result = scan_signals(all_obs, signal_state={})
+        signal_result = scan_signals(all_obs, signal_state={}, o01_trend=o01_trend)
         result["steps_completed"] += 1
     except Exception as e:
         result["errors"].append(f"Step 3 signals: {e}")
         signal_result = None
         result["steps_completed"] += 1
 
+    # A6/O14 check: H3 unfreeze if unknown weapon type detected
+    o14 = next((o for o in all_obs if o.id == "O14" and o.value > 0.5), None)
+
     # Step 4: Engine run
     try:
         constants = load_constants(configs_dir / "constants.yaml")
         params = load_parameters(configs_dir / "parameters.yaml")
+        # H3 unfreeze: if O14 detected with high confidence, switch to 3-way ACH
+        if o14 and o14.source.endswith(":high"):
+            params = params.override(h3_suspended=False)
+            result["h3_unfrozen"] = True
         controls = get_controls(db_path)
         events = signal_result.events if signal_result else {}
-        so = engine_run(constants, params, all_obs, controls, events, mc_n=100, seed=42)
+        confidence = compute_confidence_level(db_path)
+        so, mc_result = engine_run(
+            constants, params, all_obs, controls, events,
+            mc_n=config.get("mc", {}).get("n", 10000),
+            seed=config.get("mc", {}).get("seed", 42),
+            o01_trend=o01_trend,
+        )
+        so.confidence_level = confidence
+        if confidence == "burn_in":
+            so.consistency_flags.append("BURN-IN: <3 days history, output unreliable")
         result["system_output"] = so
         result["steps_completed"] += 1
     except Exception as e:
@@ -220,8 +298,22 @@ async def run_pipeline(config: dict) -> dict:
         result["errors"].append(f"Step 5 positions: {e}")
         result["steps_completed"] += 1
 
-    # Step 6: Report (skip if reporter not ready)
-    result["steps_completed"] += 1
+    # Step 6: Report generation
+    try:
+        from hormuz.app.reporter import render_status
+        report_path = Path(config.get("report_output", "data/status.html"))
+        render_status(
+            system_output=so,
+            mc_result=mc_result,
+            params=params,
+            output_path=report_path,
+            brent_price=brent_price,
+        )
+        result["report_path"] = str(report_path)
+        result["steps_completed"] += 1
+    except Exception as e:
+        result["errors"].append(f"Step 6 report: {e}")
+        result["steps_completed"] += 1
 
     # Step 7: DB snapshot
     try:

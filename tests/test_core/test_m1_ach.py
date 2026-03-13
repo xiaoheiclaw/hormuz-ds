@@ -23,10 +23,10 @@ def test_prior_with_h3_active():
 
 
 def test_likelihood_ratio_basic():
-    """O04 ammo substitution: high value = depletion (H1)"""
+    """O04 advanced_weapon_use: high value = capability preserved (H2)"""
     from hormuz.core.m1_ach import get_likelihood_ratio
     lr = get_likelihood_ratio("O04", value=0.9, context={})
-    assert lr["H1"] > lr["H2"]
+    assert lr["H2"] > lr["H1"]
 
 
 def test_t1a_t1b_unbinding():
@@ -34,30 +34,30 @@ def test_t1a_t1b_unbinding():
     from hormuz.core.m1_ach import get_likelihood_ratio
     # T1a: GPS up + frequency up -> offensive H2
     lr_a = get_likelihood_ratio("O05", value=0.8, context={"O01_trend": "rising"})
-    assert lr_a["H2"] == 5.0
+    assert lr_a["H2"] == 1.3
     # T1b: GPS up + frequency down -> defensive H2
     lr_b = get_likelihood_ratio("O05", value=0.8, context={"O01_trend": "falling"})
-    assert lr_b["H2"] == 2.0
+    assert lr_b["H2"] == 1.05
     # GPS down -> H1
     lr_c = get_likelihood_ratio("O05", value=0.2, context={})
-    assert lr_c["H1"] == 3.0
+    assert lr_c["H1"] == 1.3
 
 
 def test_bayesian_update_single():
     from hormuz.core.m1_ach import bayesian_update
     prior = {"H1": 0.475, "H2": 0.475}
-    lr = {"H1": 5.0, "H2": 1.0}
+    lr = {"H1": 3.0, "H2": 1.0}
     posterior = bayesian_update(prior, lr)
-    assert posterior["H1"] > 0.8  # strong H1 evidence
+    assert posterior["H1"] > 0.7  # strong H1 evidence
 
 
 def test_bayesian_update_multiple():
-    """Multiple H1 evidence should push posterior strongly to H1"""
+    """Multiple H1 evidence: decline fast + fragmented + crude weapons only"""
     from hormuz.core.m1_ach import run_ach
     obs = [
-        make_obs("O02", 0.9),  # attack freq decline (H1)
-        make_obs("O03", 0.9),  # coordination degrading (H1)
-        make_obs("O04", 0.9),  # ammo substitution high (H1)
+        make_obs("O02", 0.9),  # rapid attack decline (H1)
+        make_obs("O03", 0.1),  # uncoordinated/fragmented (H1)
+        make_obs("O04", 0.1),  # only crude weapons (H1)
     ]
     result = run_ach(obs, h3_suspended=True, h3_prior=0.10)
     assert isinstance(result, ACHPosterior)

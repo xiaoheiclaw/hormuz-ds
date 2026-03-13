@@ -6,9 +6,36 @@ Factory function selects backend based on config.
 from __future__ import annotations
 
 import json
+import re
 from typing import Protocol, runtime_checkable
 
 import httpx
+
+
+def _extract_json(text: str) -> dict:
+    """Extract JSON from LLM response, handling code fences."""
+    # Try direct parse first
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # Strip markdown code fence
+    m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
+    if m:
+        return json.loads(m.group(1).strip())
+    # Find first { ... } block
+    start = text.find("{")
+    if start >= 0:
+        depth = 0
+        for i, c in enumerate(text[start:], start):
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    return json.loads(text[start : i + 1])
+    raise json.JSONDecodeError("No JSON found in LLM response", text, 0)
 
 
 @runtime_checkable
@@ -32,6 +59,8 @@ class ClaudeAPIBackend:
         self.proxy = proxy
 
     async def extract(self, text: str, prompt: str) -> dict:
+        import asyncio
+
         headers = {
             "x-api-key": self.api_key,
             "anthropic-version": "2023-06-01",
@@ -42,16 +71,22 @@ class ClaudeAPIBackend:
             "max_tokens": 4096,
             "messages": [{"role": "user", "content": f"{prompt}\n\n---\n{text}"}],
         }
-        async with httpx.AsyncClient(proxy=self.proxy, timeout=60) as client:
-            resp = await client.post(
-                f"{self.base_url}/v1/messages",
-                headers=headers,
-                json=payload,
-            )
-            resp.raise_for_status()
-            content = resp.json()["content"][0]["text"]
-            # Extract JSON from response
-            return json.loads(content)
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(proxy=self.proxy, timeout=120) as client:
+                    resp = await client.post(
+                        f"{self.base_url}/v1/messages",
+                        headers=headers,
+                        json=payload,
+                    )
+                    resp.raise_for_status()
+                    content = resp.json()["content"][0]["text"]
+                    return _extract_json(content)
+            except httpx.RemoteProtocolError as e:
+                last_exc = e
+                await asyncio.sleep(2 ** attempt)
+        raise last_exc  # type: ignore[misc]
 
 
 class OpenClawBackend:
