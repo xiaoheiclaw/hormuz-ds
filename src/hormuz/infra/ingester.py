@@ -85,19 +85,75 @@ async def fetch_readwise_articles(
     return all_docs
 
 
-def parse_readwise_articles(raw: list[dict]) -> list[dict]:
-    """Normalize article fields from Readwise response."""
+def parse_readwise_articles(raw: list[dict], relevance_filter: bool = True) -> list[dict]:
+    """Normalize article fields from Readwise response.
+
+    When relevance_filter=True, pre-filter articles by keyword relevance
+    to avoid feeding irrelevant content (sports, entertainment) to LLM.
+    """
     articles = []
     for item in raw:
+        body = item.get("content") or item.get("summary") or ""
         articles.append({
             "id": item.get("id"),
             "title": item.get("title", ""),
-            "summary": item.get("summary", ""),
-            "source": item.get("source", "unknown"),
+            "summary": body,
+            "source": item.get("site_name") or item.get("source", "unknown"),
             "url": item.get("url", ""),
             "published_date": item.get("published_date"),
         })
+    if relevance_filter:
+        articles = _filter_relevant(articles)
     return articles
+
+
+# Two-tier relevance: STRONG keywords pass alone, WEAK require 2+ matches.
+# This avoids "oil-rich country" or "peace prize" false positives.
+_STRONG_KEYWORDS = {
+    # Direct Hormuz / Gulf crisis
+    "hormuz", "strait of hormuz", "persian gulf", "gulf of oman",
+    "irgc", "islamic revolutionary guard",
+    "bandar abbas", "fujairah", "ras tanura", "yanbu", "kharg island",
+    # Maritime crisis
+    "tanker attack", "shipping attack", "mine clearance", "minesweep",
+    "war risk premium", "force majeure", "blockade",
+    "vlcc", "freight surge", "convoy escort",
+    # Specific military
+    "centcom", "anti-ship missile", "naval mine",
+    "gps spoofing", "ais spoofing", "electronic warfare",
+    # Strategic energy
+    "spr release", "strategic petroleum reserve", "oil embargo",
+    "brent surge", "oil supply disruption",
+}
+
+_WEAK_KEYWORDS = {
+    # Geography (too broad alone)
+    "iran", "tehran", "saudi", "oman", "uae", "qatar", "bahrain", "kuwait",
+    # General military (too broad alone)
+    "attack", "strike", "missile", "drone", "naval", "escalat",
+    "weapon", "ceasefire", "military",
+    # General energy/maritime (too broad alone)
+    "oil", "crude", "tanker", "shipping", "pipeline", "port",
+    "brent", "opec", "petroleum", "freight",
+    # Diplomacy (too broad alone)
+    "mediation", "negotiat", "diplomat", "sanction",
+}
+
+
+def _filter_relevant(articles: list[dict]) -> list[dict]:
+    """Keep articles matching STRONG keyword or 2+ WEAK keywords."""
+    relevant = []
+    for a in articles:
+        text = (a.get("title", "") + " " + a.get("summary", "")).lower()
+        # Any strong keyword → pass
+        if any(kw in text for kw in _STRONG_KEYWORDS):
+            relevant.append(a)
+            continue
+        # 2+ weak keywords → pass
+        weak_hits = sum(1 for kw in _WEAK_KEYWORDS if kw in text)
+        if weak_hits >= 2:
+            relevant.append(a)
+    return relevant
 
 
 # ── Market data ───────────────────────────────────────────────────────
