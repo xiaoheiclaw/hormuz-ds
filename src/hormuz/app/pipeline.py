@@ -318,6 +318,11 @@ async def run_pipeline(config: dict) -> dict:
             game_signals=llm_signals,
             mc_n=config.get("mc", {}).get("n", 10000),
         )
+        # Also sync to docs/ for GitHub Pages
+        docs_html = Path(config.get("docs_dir", "docs")) / "index.html"
+        if docs_html.parent.exists():
+            import shutil
+            shutil.copy2(output_html, docs_html)
         result["steps_completed"] += 1
     except Exception as e:
         result["errors"].append(f"Step 6 report: {e}")
