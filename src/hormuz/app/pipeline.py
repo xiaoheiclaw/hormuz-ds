@@ -1,7 +1,7 @@
 """Pipeline orchestrator — 6-step engine.
 
 engine_run: pure compute chain (M1→M5→MC), zero IO.
-run_pipeline: async orchestrator with IO (fetch, analyze, persist).
+run_pipeline: async orchestrator with IO (fetch, analyze, persist, report).
 """
 
 from __future__ import annotations
@@ -145,13 +145,14 @@ def _check_consistency(
 
 
 async def run_pipeline(config: dict) -> dict:
-    """Full 5-step pipeline orchestrator.
+    """Full 6-step pipeline orchestrator.
 
     1. Fetch articles + market data
     2. LLM extract observations + Schelling signals
     3. Engine run (M1→M5→MC)
     4. Position evaluation
     5. DB snapshot
+    6. Report generation
     """
     from hormuz.core.variables import load_constants, load_parameters
     from hormuz.infra.db import (
@@ -300,6 +301,26 @@ async def run_pipeline(config: dict) -> dict:
         result["steps_completed"] += 1
     except Exception as e:
         result["errors"].append(f"Step 5 DB: {e}")
+        result["steps_completed"] += 1
+
+    # Step 6: Report generation
+    try:
+        from hormuz.app.reporter import render_status
+        output_html = Path(config.get("report_output", "data/status.html"))
+        render_status(
+            system_output=so,
+            mc_result=mc_result,
+            params=params,
+            output_path=output_html,
+            conflict_start=config.get("conflict_start", "2026-03-01"),
+            brent_price=brent_price,
+            position_result=result.get("positions"),
+            game_signals=llm_signals,
+            mc_n=config.get("mc", {}).get("n", 10000),
+        )
+        result["steps_completed"] += 1
+    except Exception as e:
+        result["errors"].append(f"Step 6 report: {e}")
         result["steps_completed"] += 1
 
     return result
