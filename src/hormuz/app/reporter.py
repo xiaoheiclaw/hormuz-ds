@@ -1,6 +1,7 @@
-"""HTML reporter — 9-section dashboard with parameter docs.
+"""HTML reporter — 9-section dashboard aligned with PRD §7.
 
-Renders SystemOutput + MCResult into self-contained HTML with base64 charts.
+Renders SystemOutput + MCResult + PositionResult into self-contained HTML
+with base64 charts. All sections per PRD output specification.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams["font.sans-serif"] = ["PingFang SC", "Heiti SC", "STHeiti", "Arial Unicode MS", "DejaVu Sans"]
 matplotlib.rcParams["axes.unicode_minus"] = False
 import numpy as np
-from jinja2 import Environment, FileSystemLoader, BaseLoader
+from jinja2 import Environment, BaseLoader
 
 from hormuz.core.types import Parameters, SystemOutput
 from hormuz.core.mc import MCResult
@@ -90,6 +91,10 @@ body { background: #07090f; font-family: 'Courier New', monospace; color: #e2e8f
 .wrap { max-width: 960px; margin: 0 auto; }
 h1 { font-size: 22px; text-align: center; margin-bottom: 8px; }
 .subtitle { text-align: center; color: #475569; font-size: 12px; margin-bottom: 32px; }
+.confidence-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; margin-left: 8px; }
+.conf-normal { background: #065f46; color: #6ee7b7; }
+.conf-low { background: #713f12; color: #fcd34d; }
+.conf-burn_in { background: #7f1d1d; color: #fca5a5; }
 .section { margin-bottom: 28px; }
 .sec-label { font-size: 12px; color: #475569; letter-spacing: 3px; margin-bottom: 10px; text-transform: uppercase; }
 .card { background: #0a0e1a; border: 1px solid #1e293b; border-radius: 10px; padding: 16px 20px; margin-bottom: 10px; }
@@ -99,6 +104,7 @@ h1 { font-size: 22px; text-align: center; margin-bottom: 8px; }
 .blue { color: #3b82f6; }
 .green { color: #10b981; }
 .red { color: #ef4444; }
+.grey { color: #64748b; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .col { flex: 1; min-width: 200px; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -109,12 +115,21 @@ td { color: #cbd5e1; }
 .flag { background: #7f1d1d22; border-left: 3px solid #ef4444; padding: 8px 12px; margin: 4px 0; font-size: 12px; color: #fca5a5; border-radius: 0 6px 6px 0; }
 img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 .pct-bar { display: inline-block; height: 6px; border-radius: 3px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.dot-off { background: #334155; }
+.dot-on { background: #f59e0b; }
+.signal-row { display: inline-flex; align-items: center; gap: 2px; margin-right: 16px; font-size: 12px; }
+.pos-action { font-size: 11px; color: #94a3b8; padding: 2px 0; }
+.pos-action:before { content: "→ "; color: #475569; }
+.sec-group { font-size: 11px; color: #64748b; padding: 4px 10px; background: #0f172a; font-weight: 600; }
 </style>
 </head>
 <body>
 <div class="wrap">
 <h1>霍尔木兹决策系统 v5.4</h1>
-<div class="subtitle">{{ timestamp }} · 冲突第 {{ conflict_day }} 天 · Brent ${{ brent_price }}</div>
+<div class="subtitle">{{ timestamp }} · 冲突第 {{ conflict_day }} 天 · Brent ${{ brent_price }}
+  <span class="confidence-badge conf-{{ confidence }}">{{ confidence_zh }}</span>
+</div>
 
 <!-- 1. 状态总览 -->
 <div class="section">
@@ -123,7 +138,7 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
   <div class="col"><div class="card">
     <div class="card-title">ACH 主导假设</div>
     <div class="big-num {{ 'green' if dominant == 'H1' else 'red' if dominant == 'H2' else 'amber' }}">{{ dominant }}</div>
-    <div style="margin-top:8px;font-size:12px;">H1={{ "%.0f"|format(h1*100) }}% H2={{ "%.0f"|format(h2*100) }}%</div>
+    <div style="margin-top:8px;font-size:12px;">H1={{ "%.0f"|format(h1*100) }}% H2={{ "%.0f"|format(h2*100) }}%{% if h3 is not none %} H3={{ "%.0f"|format(h3*100) }}%{% endif %}</div>
   </div></div>
   <div class="col"><div class="card">
     <div class="card-title">T 中位数</div>
@@ -182,9 +197,50 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 <!-- 4. 博弈层 -->
 <div class="section">
 <div class="sec-label">4 · 博弈层</div>
-<div class="card">
-  <div class="card-title">Schelling 信号 & 路径调节</div>
-  <div style="font-size:12px;color:#94a3b8;">路径权重通过博弈信号 delta 调节后归一化 + clip [5%, 85%]</div>
+<div class="row">
+  <div class="col"><div class="card">
+    <div class="card-title">Grabo 绊线状态</div>
+    <div style="margin:8px 0;">
+      <div style="margin-bottom:6px;">
+        <span style="font-size:11px;color:#64748b;">绊线 T</span><br>
+        {% for sid in ["T1a","T1b","T2","T3"] %}
+        <span class="signal-row">
+          <span class="dot {{ 'dot-on' if sid in triggered_signals else 'dot-off' }}"></span>{{ sid }}
+        </span>
+        {% endfor %}
+      </div>
+      <div style="margin-bottom:6px;">
+        <span style="font-size:11px;color:#64748b;">事件 E</span><br>
+        {% for sid in ["E1","E2","E3","E4"] %}
+        <span class="signal-row">
+          <span class="dot {{ 'dot-on' if sid in triggered_signals else 'dot-off' }}"></span>{{ sid }}
+        </span>
+        {% endfor %}
+      </div>
+      <div>
+        <span style="font-size:11px;color:#64748b;">确认 C</span><br>
+        {% for sid in ["C1","C2"] %}
+        <span class="signal-row">
+          <span class="dot {{ 'dot-on' if sid in triggered_signals else 'dot-off' }}"></span>{{ sid }}
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+  </div></div>
+  <div class="col"><div class="card">
+    <div class="card-title">Schelling 信号 & 路径调节</div>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">delta 调节后归一化 + clip [5%, 85%]</div>
+    {% if game_signals %}
+    <table>
+      <tr><th>信号</th><th>Delta</th></tr>
+      {% for gs in game_signals %}
+      <tr><td>{{ gs }}</td><td>—</td></tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div style="font-size:12px;color:#475569;">本期无博弈信号触发</div>
+    {% endif %}
+  </div></div>
 </div>
 </div>
 
@@ -210,8 +266,28 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
   {% if mc_chart %}
   <img class="chart" src="data:image/png;base64,{{ mc_chart }}" alt="MC distributions">
   {% endif %}
-  <div style="font-size:12px;margin-top:8px;">
-    路径频率: A={{ "%.0f"|format(mc_freq_a*100) }}% B={{ "%.0f"|format(mc_freq_b*100) }}% C={{ "%.0f"|format(mc_freq_c*100) }}%
+  <div style="margin-top:8px;">
+    <table>
+      <tr><th></th><th>A (快速)</th><th>B (拉锯)</th><th>C (长期)</th></tr>
+      <tr>
+        <td style="color:#64748b;">MC 物理频率</td>
+        <td>{{ "%.0f"|format(mc_freq_a*100) }}%</td>
+        <td>{{ "%.0f"|format(mc_freq_b*100) }}%</td>
+        <td>{{ "%.0f"|format(mc_freq_c*100) }}%</td>
+      </tr>
+      <tr>
+        <td style="color:#64748b;">M5 博弈调整</td>
+        <td>{{ "%.0f"|format(pa*100) }}%</td>
+        <td>{{ "%.0f"|format(pb*100) }}%</td>
+        <td>{{ "%.0f"|format(pc*100) }}%</td>
+      </tr>
+      <tr>
+        <td style="color:#64748b;">差异</td>
+        <td class="{{ 'green' if pa > mc_freq_a else 'red' if pa < mc_freq_a else 'grey' }}">{{ "%+.0f"|format((pa - mc_freq_a)*100) }}pp</td>
+        <td class="{{ 'green' if pb > mc_freq_b else 'red' if pb < mc_freq_b else 'grey' }}">{{ "%+.0f"|format((pb - mc_freq_b)*100) }}pp</td>
+        <td class="{{ 'green' if pc < mc_freq_c else 'red' if pc > mc_freq_c else 'grey' }}">{{ "%+.0f"|format((pc - mc_freq_c)*100) }}pp</td>
+      </tr>
+    </table>
   </div>
 </div>
 </div>
@@ -220,10 +296,28 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 <div class="section">
 <div class="sec-label">7 · 仓位建议</div>
 <div class="row">
-  <div class="col"><div class="card"><div class="card-title">能源多头</div><div class="big-num amber">15%</div></div></div>
-  <div class="col"><div class="card"><div class="card-title">波动率</div><div class="big-num blue">3%</div></div></div>
-  <div class="col"><div class="card"><div class="card-title">衰退对冲</div><div class="big-num green">2%</div></div></div>
+  <div class="col"><div class="card">
+    <div class="card-title">能源多头</div>
+    <div class="big-num amber">{{ pos_energy }}%</div>
+  </div></div>
+  <div class="col"><div class="card">
+    <div class="card-title">波动率</div>
+    <div class="big-num blue">{{ pos_vol }}%</div>
+  </div></div>
+  <div class="col"><div class="card">
+    <div class="card-title">衰退对冲</div>
+    <div class="big-num green">{{ pos_recession }}%</div>
+  </div></div>
 </div>
+{% if pos_actions %}
+<div class="card">
+  <div class="card-title">仓位调整动作</div>
+  {% for a in pos_actions %}
+  <div class="pos-action">{{ a }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+<div style="font-size:11px;color:#475569;margin-top:4px;">* 仅为建议，position_signals.executed 为人工确认边界</div>
 </div>
 
 <!-- 8. 参数 -->
@@ -232,14 +326,49 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 <div class="card">
 <table>
 <tr><th>ID</th><th>参数</th><th>当前值</th><th>来源/分布</th></tr>
-<tr><td>C01</td><td>正常流量</td><td>20.1 mbd</td><td>EIA/OPEC 常数</td></tr>
-<tr><td>C02</td><td>海峡宽度</td><td>9.0 km</td><td>海图 常数</td></tr>
-<tr><td>P01</td><td>总缺口</td><td>{{ gross_gap }} mbd</td><td>C01 × 0.80</td></tr>
+<tr class="sec-group"><td colspan="4">常数 (C)</td></tr>
+<tr><td>C01</td><td>正常通行流量</td><td>20.1 mbd</td><td>EIA/OPEC 常数</td></tr>
+<tr><td>C02</td><td>海峡可航宽度</td><td>9.0 km</td><td>海图 常数</td></tr>
+<tr><td>C03</td><td>扫雷面积</td><td>—</td><td>航道几何推导</td></tr>
+<tr><td>C04</td><td>水雷类型组合</td><td>接触/磁性/音响</td><td>伊朗公开库存</td></tr>
+<tr><td>C05</td><td>单舰扫雷上限</td><td>—</td><td>MCM 性能参数</td></tr>
+<tr class="sec-group"><td colspan="4">参数 (P)</td></tr>
+<tr><td>P01</td><td>总缺口</td><td>{{ gross_gap }} mbd</td><td>C01 × {{ disruption_rate }}</td></tr>
 <tr><td>P02</td><td>水中水雷</td><td>{{ mines_range }}</td><td>Uniform 分布</td></tr>
-<tr><td>P04</td><td>管道最大</td><td>{{ pipeline_max }} mbd</td><td>ADCOP + 沙特管线</td></tr>
+<tr><td>P03</td><td>扫雷舰数量</td><td>{{ sweep_ships }}</td><td>多国 MCM 部队</td></tr>
+<tr><td>P04</td><td>管道最大替代</td><td>{{ pipeline_max }} mbd</td><td>ADCOP + 沙特东西管线</td></tr>
+<tr><td>P05</td><td>管道爬坡时间</td><td>{{ pipeline_ramp }} 周</td><td>工程约束</td></tr>
 <tr><td>P06</td><td>SPR 释放率</td><td>{{ spr_rate }} mbd</td><td>DOE 均值</td></tr>
-<tr><td>P07</td><td>SPR 延迟</td><td>{{ spr_delay }} 天</td><td>物理约束</td></tr>
-<tr><td>MC</td><td>采样数</td><td>N=10000</td><td>—</td></tr>
+<tr><td>P07</td><td>SPR 启动延迟</td><td>{{ spr_delay }} 天</td><td>物理约束 (~2.5 周)</td></tr>
+<tr><td>P08</td><td>H3 暂停</td><td>{{ "是" if h3_suspended else "否" }}</td><td>梅赫拉巴德机场摧毁</td></tr>
+<tr><td>P09</td><td>H3 先验</td><td>{{ h3_prior }}</td><td>暂停时重分配至 H1/H2</td></tr>
+<tr><td>P10</td><td>有效中断率</td><td>{{ disruption_rate }}</td><td>1984 ~70%, 2026 ~92% 校准</td></tr>
+<tr class="sec-group"><td colspan="4">观测 (O)</td></tr>
+<tr><td>O01</td><td>攻击频率</td><td>[0,1]</td><td>新闻 LLM 提取</td></tr>
+<tr><td>O02</td><td>频率变化趋势</td><td>[0,1]</td><td>DB 历史计算</td></tr>
+<tr><td>O03</td><td>弹药降级比</td><td>[0,1]</td><td>新闻 LLM 提取</td></tr>
+<tr><td>O04</td><td>攻击协调性</td><td>[0,1]</td><td>新闻 LLM 提取</td></tr>
+<tr><td>O05</td><td>GPS/AIS 欺骗</td><td>[0,1]</td><td>新闻 LLM 提取</td></tr>
+<tr><td>O06</td><td>马赛克防御覆盖</td><td>[0,1]</td><td>新闻 LLM 提取</td></tr>
+<tr><td>O07</td><td>AP 战争险溢价</td><td>&gt;1% 触发</td><td>新闻 LLM 提取</td></tr>
+<tr><td>O08</td><td>P&I 72h 取消</td><td>[0,1]</td><td>新闻 LLM 提取</td></tr>
+<tr><td>O09</td><td>VLCC TD3 运费</td><td>WS 点</td><td>yfinance BWET 代理</td></tr>
+<tr><td>O10</td><td>海峡通行量</td><td>[0,1]</td><td>新闻 LLM 提取</td></tr>
+<tr><td>O11</td><td>管道替代流量</td><td>[0,1]</td><td>新闻 LLM 提取</td></tr>
+<tr><td>O12</td><td>富查伊拉-新加坡价差</td><td>$/mt</td><td>Ship&Bunker 爬取</td></tr>
+<tr><td>O13</td><td>SPR 释放率</td><td>mbd</td><td>EIA API v2</td></tr>
+<tr><td>O14</td><td>未知武器类型</td><td>[0,1]</td><td>新闻 LLM (H3 解冻)</td></tr>
+<tr class="sec-group"><td colspan="4">控制 (D)</td></tr>
+<tr><td>D01</td><td>美国护航启动</td><td>—</td><td>事件驱动</td></tr>
+<tr><td>D02</td><td>扫雷行动启动</td><td>—</td><td>事件驱动</td></tr>
+<tr><td>D03</td><td>SPR 释放命令</td><td>—</td><td>事件驱动</td></tr>
+<tr><td>D04</td><td>管道增产指令</td><td>—</td><td>事件驱动</td></tr>
+<tr><td>D05</td><td>斡旋/停火信号</td><td>—</td><td>事件驱动</td></tr>
+<tr class="sec-group"><td colspan="4">校准参照 (R)</td></tr>
+<tr><td>R01</td><td>祈祷螳螂行动</td><td>1988</td><td>Q1 基线 (一日海战)</td></tr>
+<tr><td>R02</td><td>海湾战争扫雷</td><td>1991</td><td>Q2 扫雷时间线校准</td></tr>
+<tr><td>R03</td><td>元山水雷封锁</td><td>1950</td><td>密集布雷上界 (3000枚)</td></tr>
+<tr><td>MC</td><td>采样数</td><td>N={{ mc_n }}</td><td>—</td></tr>
 <tr><td>—</td><td>路径边界</td><td>A&lt;35d / B=35-120d / C&gt;120d</td><td>PRD 定义</td></tr>
 </table>
 </div>
@@ -257,6 +386,9 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 {% endif %}
 </div>
 
+<div style="text-align:center;color:#334155;font-size:10px;margin-top:16px;">
+  hormuz-ds v5.4 · {{ timestamp }}
+</div>
 </div>
 </body>
 </html>"""
@@ -269,7 +401,10 @@ def render_status(
     output_path: Path,
     conflict_start: str = "2026-03-01",
     brent_price: float = 95.0,
-    overrides: list[dict] | None = None,
+    position_result: object | None = None,
+    triggered_signals: list[str] | None = None,
+    game_signals: list[str] | None = None,
+    mc_n: int = 10000,
 ) -> None:
     """Render full 9-section HTML dashboard."""
     so = system_output
@@ -292,6 +427,22 @@ def render_status(
                "color": "#ef4444", "desc": "长期危机 (>120天)"},
     }
 
+    # Position data
+    pos_energy = pos_vol = pos_recession = 0
+    pos_actions: list[str] = []
+    if position_result is not None:
+        pos_energy = getattr(position_result, "energy_pct", 15)
+        pos_vol = getattr(position_result, "vol_pct", 3)
+        pos_recession = getattr(position_result, "recession_pct", 2)
+        pos_actions = getattr(position_result, "actions", [])
+    else:
+        # Fallback to base positions
+        pos_energy, pos_vol, pos_recession = 15, 3, 2
+
+    # Confidence
+    conf = so.confidence_level
+    conf_zh = {"burn_in": "BURN-IN", "low": "LOW", "normal": "NORMAL"}.get(conf, conf)
+
     env = Environment(loader=BaseLoader())
     template = env.from_string(_TEMPLATE)
 
@@ -299,9 +450,12 @@ def render_status(
         timestamp=so.timestamp.strftime("%Y-%m-%d %H:%M"),
         conflict_day=conflict_day,
         brent_price=f"{brent_price:.1f}",
+        confidence=conf,
+        confidence_zh=conf_zh,
         dominant=so.ach_posterior.dominant,
         h1=so.ach_posterior.h1,
         h2=so.ach_posterior.h2,
+        h3=so.ach_posterior.h3,
         t_p50=int(so.t_total_percentiles.get("p50", 0)),
         t_p10=int(so.t_total_percentiles.get("p10", 0)),
         t_p90=int(so.t_total_percentiles.get("p90", 0)),
@@ -316,10 +470,25 @@ def render_status(
         mc_freq_b=mc_result.path_frequencies.get("B", 0),
         mc_freq_c=mc_result.path_frequencies.get("C", 0),
         paths=paths,
+        # Section 4: signals
+        triggered_signals=triggered_signals or [],
+        game_signals=game_signals or [],
+        # Section 7: positions
+        pos_energy=pos_energy,
+        pos_vol=pos_vol,
+        pos_recession=pos_recession,
+        pos_actions=pos_actions,
+        # Section 8: full params
         mines_range=f"{params.mines_in_water_range}",
+        sweep_ships=params.sweep_ships,
         pipeline_max=f"{params.pipeline_max_mbd}",
+        pipeline_ramp=f"{params.pipeline_ramp_weeks}",
         spr_rate=f"{params.spr_rate_mean_mbd}",
         spr_delay=f"{params.spr_pump_min_days}",
+        h3_suspended=params.h3_suspended,
+        h3_prior=f"{params.h3_prior}",
+        disruption_rate=f"{params.effective_disruption_rate}",
+        mc_n=mc_n,
         flags=so.consistency_flags,
     )
 

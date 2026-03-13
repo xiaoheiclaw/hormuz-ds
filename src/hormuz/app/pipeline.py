@@ -302,12 +302,20 @@ async def run_pipeline(config: dict) -> dict:
     try:
         from hormuz.app.reporter import render_status
         report_path = Path(config.get("report_output", "docs/index.html"))
+        triggered_sigs = signal_result.triggered if signal_result else []
+        game_sigs = signal_result.position_actions if signal_result else []
+        game_sig_descs = [s.get("desc", str(s)) for s in game_sigs] if game_sigs else []
         render_status(
             system_output=so,
             mc_result=mc_result,
             params=params,
             output_path=report_path,
             brent_price=brent_price,
+            conflict_start=config.get("conflict", {}).get("start_date", "2026-03-01"),
+            position_result=result.get("positions"),
+            triggered_signals=triggered_sigs,
+            game_signals=game_sig_descs,
+            mc_n=config.get("mc", {}).get("n", 10000),
         )
         result["report_path"] = str(report_path)
         result["steps_completed"] += 1
