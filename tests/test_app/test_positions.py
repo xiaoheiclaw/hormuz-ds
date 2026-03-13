@@ -21,8 +21,7 @@ def make_output(**kwargs):
 def test_base_positions():
     from hormuz.app.positions import evaluate_positions
     so = make_output()
-    signals = []
-    result = evaluate_positions(so, brent_price=95.0, signals=signals)
+    result = evaluate_positions(so, brent_price=95.0)
     assert result.energy_pct == 15
     assert result.vol_pct == 3
     assert result.recession_pct == 2
@@ -32,7 +31,7 @@ def test_t_end_exit():
     """Transit up 3 days + AP < 1% -> unwind"""
     from hormuz.app.positions import evaluate_positions
     so = make_output()
-    result = evaluate_positions(so, brent_price=85.0, signals=[], t_end_confirmed=True)
+    result = evaluate_positions(so, brent_price=85.0, t_end_confirmed=True)
     assert result.energy_pct < 15  # reducing
     assert result.vol_pct == 0     # closed
 
@@ -41,7 +40,7 @@ def test_demand_destruction():
     """Brent > 150 -> clear energy, double recession"""
     from hormuz.app.positions import evaluate_positions
     so = make_output()
-    result = evaluate_positions(so, brent_price=155.0, signals=[])
+    result = evaluate_positions(so, brent_price=155.0)
     assert result.energy_pct == 0
     assert result.recession_pct == 4
 
@@ -50,14 +49,6 @@ def test_system_failure():
     """Brent < 80 for 3 days -> force close all"""
     from hormuz.app.positions import evaluate_positions
     so = make_output()
-    result = evaluate_positions(so, brent_price=78.0, signals=[], brent_below_80_days=3)
+    result = evaluate_positions(so, brent_price=78.0, brent_below_80_days=3)
     assert result.energy_pct == 0
     assert result.vol_pct == 0
-
-
-def test_tripwire_override():
-    """T1a signal -> vol×2"""
-    from hormuz.app.positions import evaluate_positions
-    so = make_output()
-    result = evaluate_positions(so, brent_price=95.0, signals=[{"action": "vol_double"}])
-    assert result.vol_pct == 6

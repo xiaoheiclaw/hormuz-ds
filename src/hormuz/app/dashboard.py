@@ -1,4 +1,64 @@
-<!DOCTYPE html>
+"""Framework reference dashboard — system architecture + parameters.
+
+Generates a self-contained HTML page showing the Hormuz-DS framework:
+pipeline flow, model parameters, signal definitions, position rules.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from hormuz.core.m5_game import _SIGNAL_DEFS, _COMBO_REQUIRES, BASE_SENSITIVITY, FOCAL_BONUS
+from hormuz.core.m1_ach import _LR_TABLE
+
+
+def _signal_rows() -> str:
+    rows = []
+    for key, sdef in _SIGNAL_DEFS.items():
+        cred = sdef.credibility
+        combo = _COMBO_REQUIRES.get(key)
+        combo_str = f'需要: {", ".join(combo)}' if combo else "—"
+        dir_class = {"A": "green", "B": "amber", "C": "red"}[sdef.direction]
+        rows.append(
+            f'<tr><td>{key}</td>'
+            f'<td class="{dir_class}">{sdef.direction}</td>'
+            f'<td>{sdef.cost:.1f}</td>'
+            f'<td>{sdef.observability:.1f}</td>'
+            f'<td class="mono">{cred:.2f}</td>'
+            f'<td class="dim">{combo_str}</td></tr>'
+        )
+    return "\n".join(rows)
+
+
+def _lr_rows() -> str:
+    obs_names = {
+        "O01": "攻击频率", "O02": "频率变化趋势", "O03": "攻击协调性",
+        "O04": "高级武器使用", "O06": "马赛克防御覆盖",
+        "O07": "战争险溢价", "O08": "P&I 72h取消",
+        "O10": "海峡通行量", "O11": "管道替代流量",
+    }
+    rows = []
+    for obs_id, dirs in sorted(_LR_TABLE.items()):
+        name = obs_names.get(obs_id, obs_id)
+        h = dirs["high"]
+        l = dirs["low"]
+
+        def _fmt(v: float) -> str:
+            if v > 1.0:
+                return f'<span class="green">{v:.2f}</span>'
+            elif v < 1.0:
+                return f'<span class="red">{v:.2f}</span>'
+            return f'{v:.2f}'
+
+        rows.append(
+            f'<tr><td>{obs_id}</td><td>{name}</td>'
+            f'<td>{_fmt(h["H1"])}</td><td>{_fmt(h["H2"])}</td>'
+            f'<td>{_fmt(l["H1"])}</td><td>{_fmt(l["H2"])}</td></tr>'
+        )
+    return "\n".join(rows)
+
+
+_TEMPLATE = """<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
@@ -164,15 +224,7 @@ td { color: #cbd5e1; }
 <table>
 <tr><th>ID</th><th>观测</th><th colspan="2">High (value&gt;0.5)</th><th colspan="2">Low (value≤0.5)</th></tr>
 <tr><th></th><th></th><th>H1</th><th>H2</th><th>H1</th><th>H2</th></tr>
-<tr><td>O01</td><td>攻击频率</td><td><span class="red">0.95</span></td><td><span class="green">1.05</span></td><td><span class="green">1.05</span></td><td><span class="red">0.95</span></td></tr>
-<tr><td>O02</td><td>频率变化趋势</td><td><span class="green">1.30</span></td><td><span class="red">0.77</span></td><td><span class="red">0.95</span></td><td><span class="green">1.05</span></td></tr>
-<tr><td>O03</td><td>攻击协调性</td><td><span class="red">0.77</span></td><td><span class="green">1.30</span></td><td><span class="green">1.30</span></td><td><span class="red">0.77</span></td></tr>
-<tr><td>O04</td><td>高级武器使用</td><td><span class="red">0.77</span></td><td><span class="green">1.30</span></td><td><span class="green">1.30</span></td><td><span class="red">0.77</span></td></tr>
-<tr><td>O06</td><td>马赛克防御覆盖</td><td><span class="red">0.95</span></td><td><span class="green">1.05</span></td><td><span class="green">1.05</span></td><td><span class="red">0.95</span></td></tr>
-<tr><td>O07</td><td>战争险溢价</td><td><span class="red">0.95</span></td><td><span class="green">1.05</span></td><td><span class="green">1.05</span></td><td><span class="red">0.95</span></td></tr>
-<tr><td>O08</td><td>P&I 72h取消</td><td><span class="red">0.95</span></td><td><span class="green">1.05</span></td><td><span class="green">1.05</span></td><td><span class="red">0.95</span></td></tr>
-<tr><td>O10</td><td>海峡通行量</td><td><span class="green">1.05</span></td><td><span class="red">0.95</span></td><td><span class="red">0.95</span></td><td><span class="green">1.05</span></td></tr>
-<tr><td>O11</td><td>管道替代流量</td><td><span class="red">0.95</span></td><td><span class="green">1.05</span></td><td><span class="green">1.05</span></td><td><span class="red">0.95</span></td></tr>
+%%LR_ROWS%%
 <tr class="sec-group"><td colspan="6">O05 GPS欺骗 — 特殊处理: T1a/T1b 解绑 (依赖 O01 趋势)</td></tr>
 </table>
 </div>
@@ -277,8 +329,8 @@ td { color: #cbd5e1; }
 <div class="sec-label">全局调参旋钮</div>
 <div class="card">
 <table>
-<tr><td>BASE_SENSITIVITY</td><td class="param-val">0.15</td><td class="dim">单位可信度×证据的路径偏移量</td></tr>
-<tr><td>FOCAL_BONUS</td><td class="param-val">0.4</td><td class="dim">每多一条同方向信号的放大系数</td></tr>
+<tr><td>BASE_SENSITIVITY</td><td class="param-val">%%BASE_SENSITIVITY%%</td><td class="dim">单位可信度×证据的路径偏移量</td></tr>
+<tr><td>FOCAL_BONUS</td><td class="param-val">%%FOCAL_BONUS%%</td><td class="dim">每多一条同方向信号的放大系数</td></tr>
 </table>
 </div>
 </div>
@@ -288,11 +340,7 @@ td { color: #cbd5e1; }
 <div class="card">
 <table>
 <tr><th>信号</th><th>方向</th><th>cost</th><th>observ.</th><th>credibility</th><th>前置</th></tr>
-<tr><td>external_mediation</td><td class="green">A</td><td>0.3</td><td>0.5</td><td class="mono">0.38</td><td class="dim">—</td></tr>
-<tr><td>us_inconsistency</td><td class="amber">B</td><td>0.2</td><td>0.9</td><td class="mono">0.48</td><td class="dim">—</td></tr>
-<tr><td>costly_self_binding</td><td class="green">A</td><td>0.8</td><td>0.7</td><td class="mono">0.76</td><td class="dim">—</td></tr>
-<tr><td>irgc_escalation</td><td class="red">C</td><td>0.9</td><td>0.6</td><td class="mono">0.78</td><td class="dim">—</td></tr>
-<tr><td>irgc_fragmentation</td><td class="green">A</td><td>0.5</td><td>0.4</td><td class="mono">0.46</td><td class="dim">需要: us_inconsistency</td></tr>
+%%SIGNAL_ROWS%%
 </table>
 </div>
 </div>
@@ -391,4 +439,24 @@ function switchTab(id) {
 }
 </script>
 </body>
-</html>
+</html>"""
+
+
+def generate_dashboard(output_path: Path | str = "docs/index.html") -> Path:
+    """Generate framework reference dashboard HTML."""
+    output_path = Path(output_path)
+
+    html = _TEMPLATE
+    html = html.replace("%%SIGNAL_ROWS%%", _signal_rows())
+    html = html.replace("%%LR_ROWS%%", _lr_rows())
+    html = html.replace("%%BASE_SENSITIVITY%%", str(BASE_SENSITIVITY))
+    html = html.replace("%%FOCAL_BONUS%%", str(FOCAL_BONUS))
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(html, encoding="utf-8")
+    return output_path
+
+
+if __name__ == "__main__":
+    path = generate_dashboard()
+    print(f"Dashboard generated: {path}")

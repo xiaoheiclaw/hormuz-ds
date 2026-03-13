@@ -1,4 +1,4 @@
-"""Pipeline orchestrator — 7-step engine with signal-first semantics.
+"""Pipeline orchestrator — 6-step engine.
 
 engine_run: pure compute chain (M1→M5→MC), zero IO.
 run_pipeline: async orchestrator with IO (fetch, analyze, persist).
@@ -40,7 +40,7 @@ def engine_run(
     mc_n: int = 10000,
     seed: int | None = None,
     o01_trend: str = "stable",
-    schelling_signals: list[str] | None = None,
+    schelling_signals: list | None = None,
 ) -> tuple[SystemOutput, MCResult]:
     """Pure compute chain: M1 → M2 → M3 → M4 → M5 → MC.
 
@@ -87,12 +87,13 @@ def engine_run(
     mc_result = run_monte_carlo(posterior, params, events, n=mc_n, seed=seed)
 
     # M5: Game theory path adjustment
-    # Base weights from MC physical simulation, then game signals adjust
-    # Sources: 1) controls table (manual), 2) LLM-extracted Schelling signals
-    game_signals = []
+    # Base weights from MC physical simulation, then Schelling signals adjust
+    # Sources: 1) controls table (manual → medium evidence), 2) LLM-extracted signals
+    from hormuz.core.m5_game import SignalEvidence
+    game_signals: list[SignalEvidence] = []
     for ctrl in controls:
         if ctrl.triggered and ctrl.effect:
-            game_signals.append(ctrl.effect)
+            game_signals.append(SignalEvidence(key=ctrl.effect, evidence=0.5))
     if schelling_signals:
         game_signals.extend(schelling_signals)
     mc_base = PathWeights(
@@ -100,7 +101,7 @@ def engine_run(
         b=mc_result.path_frequencies["B"],
         c=mc_result.path_frequencies["C"],
     )
-    path_probs = adjust_path_weights(mc_base, active_signals=game_signals)
+    path_probs = adjust_path_weights(mc_base, signals=game_signals)
 
     # Expected total gap
     expected_gap = (
@@ -144,15 +145,13 @@ def _check_consistency(
 
 
 async def run_pipeline(config: dict) -> dict:
-    """Full 7-step pipeline orchestrator.
+    """Full 5-step pipeline orchestrator.
 
     1. Fetch articles + market data
-    2. LLM extract observations
-    3. Signal scan (穿透语义, before ACH)
-    4. Engine run (M1→M5→MC)
-    5. Position evaluation
-    6. Report generation (if reporter available)
-    7. DB snapshot
+    2. LLM extract observations + Schelling signals
+    3. Engine run (M1→M5→MC)
+    4. Position evaluation
+    5. DB snapshot
     """
     from hormuz.core.variables import load_constants, load_parameters
     from hormuz.infra.db import (
@@ -164,7 +163,6 @@ async def run_pipeline(config: dict) -> dict:
         compute_o01_trend,
         compute_confidence_level,
     )
-    from hormuz.app.signals import scan_signals
     from hormuz.app.positions import evaluate_positions
 
     result: dict = {"steps_completed": 0, "errors": []}
@@ -256,19 +254,10 @@ async def run_pipeline(config: dict) -> dict:
     # Compute O01 trend from DB history (for T1a/T1b and signal scan)
     o01_trend = compute_o01_trend(db_path)
 
-    # Step 3: Signal scan (穿透, before ACH)
-    try:
-        signal_result = scan_signals(all_obs, signal_state={}, o01_trend=o01_trend)
-        result["steps_completed"] += 1
-    except Exception as e:
-        result["errors"].append(f"Step 3 signals: {e}")
-        signal_result = None
-        result["steps_completed"] += 1
-
     # A6/O14 check: H3 unfreeze if unknown weapon type detected
     o14 = next((o for o in all_obs if o.id == "O14" and o.value > 0.5), None)
 
-    # Step 4: Engine run
+    # Step 3: Engine run
     try:
         constants = load_constants(configs_dir / "constants.yaml")
         params = load_parameters(configs_dir / "parameters.yaml")
@@ -277,10 +266,9 @@ async def run_pipeline(config: dict) -> dict:
             params = params.override(h3_suspended=False)
             result["h3_unfrozen"] = True
         controls = get_controls(db_path)
-        events = signal_result.events if signal_result else {}
         confidence = compute_confidence_level(db_path)
         so, mc_result = engine_run(
-            constants, params, all_obs, controls, events,
+            constants, params, all_obs, controls, events={},
             mc_n=config.get("mc", {}).get("n", 10000),
             seed=config.get("mc", {}).get("seed", 42),
             o01_trend=o01_trend,
@@ -293,51 +281,25 @@ async def run_pipeline(config: dict) -> dict:
         result["system_output"] = so
         result["steps_completed"] += 1
     except Exception as e:
-        result["errors"].append(f"Step 4 engine: {e}")
+        result["errors"].append(f"Step 3 engine: {e}")
         result["steps_completed"] += 1
         return result
 
-    # Step 5: Position evaluation
+    # Step 4: Position evaluation
     try:
-        pos_actions = signal_result.position_actions if signal_result else []
-        pos = evaluate_positions(so, brent_price=brent_price, signals=pos_actions)
+        pos = evaluate_positions(so, brent_price=brent_price)
         result["positions"] = pos
         result["steps_completed"] += 1
     except Exception as e:
-        result["errors"].append(f"Step 5 positions: {e}")
+        result["errors"].append(f"Step 4 positions: {e}")
         result["steps_completed"] += 1
 
-    # Step 6: Report generation
-    try:
-        from hormuz.app.reporter import render_status
-        report_path = Path(config.get("report_output", "docs/index.html"))
-        triggered_sigs = signal_result.triggered if signal_result else []
-        # Schelling signals for display (LLM-extracted + manual controls)
-        schelling_descs = llm_signals[:]  # already string keys
-        render_status(
-            system_output=so,
-            mc_result=mc_result,
-            params=params,
-            output_path=report_path,
-            brent_price=brent_price,
-            conflict_start=config.get("conflict", {}).get("start_date", "2026-03-01"),
-            position_result=result.get("positions"),
-            triggered_signals=triggered_sigs,
-            game_signals=schelling_descs,
-            mc_n=config.get("mc", {}).get("n", 10000),
-        )
-        result["report_path"] = str(report_path)
-        result["steps_completed"] += 1
-    except Exception as e:
-        result["errors"].append(f"Step 6 report: {e}")
-        result["steps_completed"] += 1
-
-    # Step 7: DB snapshot
+    # Step 5: DB snapshot
     try:
         save_system_output(db_path, so)
         result["steps_completed"] += 1
     except Exception as e:
-        result["errors"].append(f"Step 7 DB: {e}")
+        result["errors"].append(f"Step 5 DB: {e}")
         result["steps_completed"] += 1
 
     return result

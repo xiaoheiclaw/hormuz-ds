@@ -1,4 +1,4 @@
-"""Position rules engine — base positions + exit rules + tripwire overrides.
+"""Position rules engine — base positions + exit rules.
 
 executed field is the human confirmation boundary.
 """
@@ -28,40 +28,20 @@ _BASE_RECESSION = 2
 def evaluate_positions(
     system_output: SystemOutput,
     brent_price: float,
-    signals: list[dict],
     t_end_confirmed: bool = False,
     brent_below_80_days: int = 0,
 ) -> PositionResult:
     """Evaluate position recommendations.
 
     1. Start with base positions (15/3/2)
-    2. Apply tripwire overrides from signals
-    3. Check exit rules: T end / $150 / $80
+    2. Check exit rules: T end / $150 / $80
     """
     energy = _BASE_ENERGY
     vol = _BASE_VOL
     recession = _BASE_RECESSION
     actions: list[str] = []
 
-    # ── Step 1: Apply tripwire signal overrides ───────────────────
-    for sig in signals:
-        action = sig.get("action", "")
-        if action == "vol_double":
-            vol *= 2
-            actions.append("vol×2 (tripwire)")
-        elif action == "vol_add_50pct":
-            vol = int(vol * 1.5)
-            actions.append("vol×1.5 (tripwire)")
-        elif action == "energy_add_5":
-            energy += 5
-            actions.append("energy+5% (tripwire)")
-        elif action == "recession_5":
-            recession = 5
-            actions.append("recession→5% (tripwire)")
-        elif action == "escalation":
-            actions.append("escalation signal — review all positions")
-
-    # ── Step 2: Exit rules (override everything above) ────────────
+    # ── Exit rules (override base) ──────────────────────────────────
 
     # System failure: Brent < $80 for 3+ days
     if brent_below_80_days >= 3:

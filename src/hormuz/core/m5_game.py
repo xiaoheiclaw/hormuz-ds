@@ -1,41 +1,58 @@
-"""M5: Game theory path weight adjuster — PRD §6.
+"""M5: Schelling credibility-based game theory path adjuster.
 
-Schelling signal multipliers applied sequentially, then normalize + clip.
-Multiplicative logic: consistent relative impact regardless of base weight.
+Signals carry evidence strength from LLM extraction.
+Adjustment = credibility × evidence × sensitivity, with focal convergence.
+
+Credibility = cost × 0.6 + observability × 0.4 (structural, per signal type).
+Focal convergence: N same-direction signals → non-linear amplification.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from hormuz.core.types import ACHPosterior, PathWeights
 
-# PRD §6 Schelling signal table
-# Multipliers: >1 = more likely, <1 = less likely
-# e.g., a=1.3 means "A path becomes 30% more likely"
-#
-# Design principles:
-#   - Multiplicative: same signal = same relative impact at any base
-#   - Combo signals stronger than prerequisites (higher evidence bar → bigger payoff)
-#   - Escalation signals have larger multipliers than de-escalation (bad news > good news)
-#   - B is explicitly targeted, not just residual
+# ── Base sensitivity — global knob for all signal effects ────────────
+BASE_SENSITIVITY = 0.15
 
-_SIGNAL_MULTIPLIERS: dict[str, dict[str, float]] = {
-    # S1: third-party mediation (Oman, Qatar, China)
-    "external_mediation":   {"a": 1.25, "b": 1.05, "c": 0.80},
-    # S2: contradictory US messaging — uncertainty increases B and C
-    "us_inconsistency":     {"a": 1.05, "b": 1.10, "c": 1.05},
-    # S3: costly commitment to de-escalation
-    "costly_self_binding":  {"a": 1.30, "b": 1.00, "c": 0.80},
-    # S4: IRGC infrastructure escalation — strongest signal
-    "irgc_escalation":      {"a": 0.70, "b": 0.85, "c": 1.60},
-    # S5: diplomatic window (combo: mediation + self_binding)
-    "peace_window":         {"a": 1.50, "b": 0.90, "c": 0.60},
-    # S6: IRGC internal disagreement (combo: us_inconsistency)
-    "irgc_fragmentation":   {"a": 1.30, "b": 1.10, "c": 0.75},
+# ── Focal convergence bonus per additional same-direction signal ─────
+FOCAL_BONUS = 0.4
+
+
+@dataclass(frozen=True)
+class SignalEvidence:
+    """A signal observation with evidence strength from LLM."""
+    key: str
+    evidence: float  # 0-1: high=1.0, medium=0.5, low=0.2
+
+
+@dataclass(frozen=True)
+class SignalDef:
+    """Structural definition of a Schelling signal."""
+    direction: str       # "A" | "B" | "C" — which path this makes focal
+    cost: float          # 0-1: how costly to fake
+    observability: float # 0-1: how publicly verifiable
+
+    @property
+    def credibility(self) -> float:
+        return self.cost * 0.6 + self.observability * 0.4
+
+
+_SIGNAL_DEFS: dict[str, SignalDef] = {
+    # Diplomatic talk — low cost, moderately public
+    "external_mediation":   SignalDef(direction="A", cost=0.3, observability=0.5),
+    # Contradictory US messaging — very cheap, very public
+    "us_inconsistency":     SignalDef(direction="B", cost=0.2, observability=0.9),
+    # Costly commitment to de-escalation — costly by definition, moderately public
+    "costly_self_binding":  SignalDef(direction="A", cost=0.8, observability=0.7),
+    # IRGC infrastructure escalation — very costly (irreversible), moderately public
+    "irgc_escalation":      SignalDef(direction="C", cost=0.9, observability=0.6),
+    # IRGC internal disagreement — moderate cost, hard to verify
+    "irgc_fragmentation":   SignalDef(direction="A", cost=0.5, observability=0.4),
 }
 
-# Combo requirements: signal requires all listed prerequisites to be active
+# Combo requirements: signal requires all listed prerequisites
 _COMBO_REQUIRES: dict[str, list[str]] = {
-    "peace_window": ["external_mediation", "costly_self_binding"],
     "irgc_fragmentation": ["us_inconsistency"],
 }
 
@@ -56,34 +73,67 @@ def ach_to_base_weights(posterior: ACHPosterior) -> PathWeights:
 
 def adjust_path_weights(
     base: PathWeights,
-    active_signals: list[str],
+    signals: list[SignalEvidence],
 ) -> PathWeights:
-    """Apply signal multipliers sequentially, normalize + clip after each.
+    """Apply Schelling credibility-based adjustment to path weights.
 
-    Multiplicative: weight *= multiplier, then renormalize.
-    Combo signals only fire if prerequisites are also in active_signals.
+    1. Filter: skip unknown signals, check combo prereqs
+    2. Compute effective strength per signal: credibility × evidence × BASE_SENSITIVITY
+    3. Group by direction, apply focal convergence (non-linear for same-direction)
+    4. Shift target paths up, redistribute from others, normalize + clip
     """
-    if not active_signals:
+    if not signals:
         return base
 
-    signal_set = set(active_signals)
+    signal_keys = {s.key for s in signals}
 
-    current = base
-    for signal in active_signals:
-        mults = _SIGNAL_MULTIPLIERS.get(signal)
-        if mults is None:
+    # Filter valid signals with prereq check
+    active: list[tuple[SignalDef, float]] = []  # (def, evidence)
+    for sig in signals:
+        sdef = _SIGNAL_DEFS.get(sig.key)
+        if sdef is None:
             continue
-
-        # Check combo prerequisites
-        prereqs = _COMBO_REQUIRES.get(signal)
-        if prereqs and not all(p in signal_set for p in prereqs):
+        prereqs = _COMBO_REQUIRES.get(sig.key)
+        if prereqs and not all(p in signal_keys for p in prereqs):
             continue
+        if sig.evidence <= 0:
+            continue
+        active.append((sdef, sig.evidence))
 
-        raw = PathWeights(
-            a=current.a * mults["a"],
-            b=current.b * mults["b"],
-            c=current.c * mults["c"],
-        )
-        current = raw.normalized()
+    if not active:
+        return base
 
-    return current
+    # Group strengths by direction
+    dir_strengths: dict[str, list[float]] = {"A": [], "B": [], "C": []}
+    for sdef, evidence in active:
+        strength = sdef.credibility * evidence * BASE_SENSITIVITY
+        dir_strengths[sdef.direction].append(strength)
+
+    # Compute total shift per direction with focal convergence
+    dir_shift: dict[str, float] = {}
+    for d, strengths in dir_strengths.items():
+        if not strengths:
+            dir_shift[d] = 0.0
+            continue
+        raw_sum = sum(strengths)
+        n = len(strengths)
+        focal = 1.0 + FOCAL_BONUS * (n - 1) if n > 1 else 1.0
+        dir_shift[d] = raw_sum * focal
+
+    # Apply shifts to weights
+    weights = {"A": base.a, "B": base.b, "C": base.c}
+    for d in ("A", "B", "C"):
+        shift = dir_shift.get(d, 0.0)
+        if shift > 0:
+            # Boost target direction
+            weights[d] *= (1.0 + shift)
+            # Dampen other directions proportionally
+            others = [x for x in ("A", "B", "C") if x != d]
+            for o in others:
+                weights[o] *= (1.0 - shift * 0.3)
+
+    # Ensure no negative
+    for d in weights:
+        weights[d] = max(weights[d], 0.001)
+
+    return PathWeights(a=weights["A"], b=weights["B"], c=weights["C"]).normalized()

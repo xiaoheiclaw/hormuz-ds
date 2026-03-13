@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from hormuz.core.types import Observation
+from hormuz.core.m5_game import SignalEvidence
 from hormuz.infra.llm import LLMBackend
+
+_EVIDENCE_MAP = {"high": 1.0, "medium": 0.5, "low": 0.2}
 
 _EXTRACTION_PROMPT = """You are an intelligence analyst for the Hormuz Strait crisis monitoring system.
 
@@ -16,7 +19,7 @@ Give VALUES that reflect reality, not your hypothesis about which side it suppor
 Return JSON only:
 {
   "observations": [{"id": "O01", "value": 0.8, "confidence": "high"}, ...],
-  "signals": ["external_mediation", "irgc_escalation", ...]
+  "signals": [{"key": "external_mediation", "evidence": "high"}, ...]
 }
 
 ## A-GROUP: Threat Status (feed ACH engine, 0-1 scale)
@@ -120,11 +123,6 @@ irgc_escalation — IRGC escalation against oil infrastructure (cross-layer with
   "Fujairah port hit", "infrastructure targeted", "storage facility ablaze",
   "IRGC claims attack on Saudi oil facility"
 
-peace_window — Diplomatic window opening (only valid if mediation + self-binding both present).
-  News phrases: "framework agreement", "terms proposed and accepted", "ceasefire roadmap",
-  "both sides agreed to talks", "peace conference announced"
-  NOTE: Only include if BOTH mediation and self-binding evidence exist in same news cycle.
-
 irgc_fragmentation — Signs of IRGC internal disagreement.
   News phrases: "IRGC commander defected", "internal power struggle", "Quds Force vs Navy dispute",
   "hardliners vs pragmatists split", "reports of insubordination", "IRGC leadership shake-up"
@@ -135,7 +133,7 @@ irgc_fragmentation — Signs of IRGC internal disagreement.
 - Give confidence: "high" (explicit numbers/quotes), "medium" (reasonable inference), "low" (vague mention).
 - O01-O06, O08, O10, O11, O14: stay within [0, 1].
 - O07: percentage points. O09: WS points. O12: $/mt. O13: mbd.
-- signals: array of string keys. Empty array if no signals detected. Most days will be empty.
+- signals: array of objects with "key" and "evidence" (high/medium/low). Empty array if no signals detected. Most days will be empty.
 """
 
 
@@ -143,14 +141,14 @@ irgc_fragmentation — Signs of IRGC internal disagreement.
 class ExtractionResult:
     """Combined extraction output: observations + Schelling signals."""
     observations: list[Observation] = field(default_factory=list)
-    signals: list[str] = field(default_factory=list)
+    signals: list[SignalEvidence] = field(default_factory=list)
 
 
 async def _extract_batch(
     articles: list[dict],
     llm: LLMBackend,
     ts: datetime,
-) -> tuple[list[Observation], list[str]]:
+) -> tuple[list[Observation], list[SignalEvidence]]:
     """Extract observations and signals from a single batch of articles."""
     text_parts = []
     for a in articles:
@@ -168,15 +166,27 @@ async def _extract_batch(
             source=f"llm:{item.get('confidence', 'unknown')}",
         ))
 
-    signals = result.get("signals", [])
-    if not isinstance(signals, list):
-        signals = []
-    # Validate signal keys
-    valid_signals = {
+    raw_signals = result.get("signals", [])
+    if not isinstance(raw_signals, list):
+        raw_signals = []
+
+    valid_keys = {
         "external_mediation", "us_inconsistency", "costly_self_binding",
-        "irgc_escalation", "peace_window", "irgc_fragmentation",
+        "irgc_escalation", "irgc_fragmentation",
     }
-    signals = [s for s in signals if s in valid_signals]
+    signals: list[SignalEvidence] = []
+    for s in raw_signals:
+        if isinstance(s, dict):
+            key = s.get("key", "")
+            evidence = _EVIDENCE_MAP.get(s.get("evidence", "low"), 0.2)
+        elif isinstance(s, str):
+            # Backwards compat: plain string → default medium evidence
+            key = s
+            evidence = 0.5
+        else:
+            continue
+        if key in valid_keys:
+            signals.append(SignalEvidence(key=key, evidence=evidence))
 
     return observations, signals
 
@@ -200,7 +210,7 @@ async def extract_observations(
 
     # Process in batches
     all_obs: list[Observation] = []
-    all_signals: list[str] = []
+    all_signals: list[SignalEvidence] = []
     for i in range(0, len(articles), batch_size):
         batch = articles[i : i + batch_size]
         try:
@@ -221,10 +231,13 @@ async def extract_observations(
         elif rank > best[o.id][1]:
             best[o.id] = (o, rank)
 
-    # Deduplicate signals
-    unique_signals = list(dict.fromkeys(all_signals))
+    # Deduplicate signals: keep highest evidence per key
+    best_sigs: dict[str, SignalEvidence] = {}
+    for s in all_signals:
+        if s.key not in best_sigs or s.evidence > best_sigs[s.key].evidence:
+            best_sigs[s.key] = s
 
     return ExtractionResult(
         observations=[obs for obs, _ in best.values()],
-        signals=unique_signals,
+        signals=list(best_sigs.values()),
     )

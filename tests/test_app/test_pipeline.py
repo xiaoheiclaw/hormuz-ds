@@ -29,7 +29,7 @@ async def test_pipeline_full_run(db_path, tmp_path):
          patch("hormuz.app.pipeline.fetch_market_data", new_callable=AsyncMock, return_value={"brent": 95.0}), \
          patch("hormuz.app.pipeline.extract_observations", new_callable=AsyncMock, return_value=mock_extraction):
         result = await run_pipeline(config)
-    assert result["steps_completed"] >= 5
+    assert result["steps_completed"] >= 4
     assert "system_output" in result
 
 

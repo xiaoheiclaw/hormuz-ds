@@ -26,9 +26,8 @@ def test_engine_run_produces_valid_output(setup):
 
 
 def test_full_roundtrip(setup):
-    """Engine run -> save to DB -> load from DB -> render HTML"""
+    """Engine run -> save to DB -> load from DB"""
     from hormuz.app.pipeline import engine_run
-    from hormuz.app.reporter import render_status
     from hormuz.infra.db import save_system_output, get_latest_output
     from hormuz.core.variables import load_constants, load_parameters
 
@@ -41,11 +40,6 @@ def test_full_roundtrip(setup):
     loaded = get_latest_output(setup["db_path"])
     assert loaded is not None
     assert loaded.gross_gap_mbd == so.gross_gap_mbd
-    out_html = setup["output_dir"] / "status.html"
-    render_status(so, mc_result, params, output_path=out_html,
-                  conflict_start="2026-03-01", brent_price=95.0)
-    assert out_html.exists()
-    assert len(out_html.read_text()) > 1000
 
 
 def test_all_core_tests_pass():

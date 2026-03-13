@@ -239,7 +239,7 @@ async def _backfill(config_path, days, batch_size):
                 total_obs += len(obs)
                 ids = sorted(set(o.id for o in obs))
                 sigs = extraction.signals
-                sig_str = f" + signals: {', '.join(sigs)}" if sigs else ""
+                sig_str = f" + signals: {', '.join(s.key for s in sigs)}" if sigs else ""
                 click.echo(f" {len(obs)} obs ({', '.join(ids)}){sig_str}")
             else:
                 click.echo(" 0 obs")
