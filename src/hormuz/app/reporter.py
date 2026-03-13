@@ -378,27 +378,6 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 </div>
 
 <div class="section">
-<div class="sec-label">M5 Schelling 信号定义</div>
-<div class="card">
-<div class="card-title">credibility = cost × 0.6 + observability × 0.4 · strength = credibility × evidence × {{ base_sensitivity }} · focal = 1 + {{ focal_bonus }} × (N−1)</div>
-<table>
-<tr><th>信号</th><th>方向</th><th>cost</th><th>observ.</th><th>credibility</th><th>前置要求</th></tr>
-{% for key, sdef in signal_defs.items() %}
-{% set combo = combo_requires.get(key) %}
-<tr>
-  <td>{{ signal_names.get(key, key) }}</td>
-  <td class="{{ {'A':'green','B':'amber','C':'red'}[sdef.direction] }}">{{ sdef.direction }}</td>
-  <td>{{ "%.1f"|format(sdef.cost) }}</td>
-  <td>{{ "%.1f"|format(sdef.observability) }}</td>
-  <td class="mono param-val">{{ "%.2f"|format(sdef.credibility) }}</td>
-  <td class="dim">{{ combo|join(', ') if combo else '—' }}</td>
-</tr>
-{% endfor %}
-</table>
-</div>
-</div>
-
-<div class="section">
 <div class="sec-label">参数总表</div>
 <div class="card">
 <table>
@@ -483,6 +462,27 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 <tr><td>actor</td><td>行为者（US / Iran / IRGC / mediator / …）</td></tr>
 <tr><td>triggered</td><td>是否激活（DB 手动标记）</td></tr>
 <tr><td>effect</td><td>→ Schelling 信号 key（如 costly_self_binding）</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<div class="sec-label">M5 Schelling 信号定义</div>
+<div class="card">
+<div class="card-title">credibility = cost × 0.6 + observability × 0.4 · strength = credibility × evidence × {{ base_sensitivity }} · focal = 1 + {{ focal_bonus }} × (N−1)</div>
+<table>
+<tr><th>信号</th><th>方向</th><th>cost</th><th>observ.</th><th>credibility</th><th>前置要求</th></tr>
+{% for key, sdef in signal_defs.items() %}
+{% set combo = combo_requires.get(key) %}
+<tr>
+  <td>{{ signal_names.get(key, key) }}</td>
+  <td class="{{ {'A':'green','B':'amber','C':'red'}[sdef.direction] }}">{{ sdef.direction }}</td>
+  <td>{{ "%.1f"|format(sdef.cost) }}</td>
+  <td>{{ "%.1f"|format(sdef.observability) }}</td>
+  <td class="mono param-val">{{ "%.2f"|format(sdef.credibility) }}</td>
+  <td class="dim">{{ combo|join(', ') if combo else '—' }}</td>
+</tr>
+{% endfor %}
 </table>
 </div>
 </div>
