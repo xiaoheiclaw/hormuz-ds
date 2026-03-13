@@ -403,27 +403,98 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 <div class="card">
 <table>
 <tr><th>ID</th><th>参数</th><th>当前值</th><th>来源</th></tr>
-<tr class="sec-group"><td colspan="4">常数 (C)</td></tr>
+<tr class="sec-group"><td colspan="4">常数 (C) — 物理定律/地理，永不变</td></tr>
 <tr><td>C01</td><td>正常通行流量</td><td>20.1 mbd</td><td>EIA/OPEC</td></tr>
 <tr><td>C02</td><td>海峡可航宽度</td><td>9.0 km</td><td>海图</td></tr>
-<tr class="sec-group"><td colspan="4">参数 (P)</td></tr>
-<tr><td>P01</td><td>总缺口</td><td>{{ gross_gap }} mbd</td><td>C01 × {{ disruption_rate }}</td></tr>
-<tr><td>P02</td><td>水中水雷</td><td>{{ mines_range }}</td><td>Uniform</td></tr>
-<tr><td>P03</td><td>扫雷舰</td><td>{{ sweep_ships }}</td><td>多国 MCM</td></tr>
+<tr><td>C03</td><td>扫雷面积</td><td>航道总雷区面积</td><td>海图</td></tr>
+<tr><td>C04</td><td>水雷类型</td><td>触发/磁性/声学</td><td>伊朗已知库存</td></tr>
+<tr><td>C05</td><td>单舰扫雷上限</td><td>每天最大清扫面积</td><td>MCM 规格</td></tr>
+<tr class="sec-group"><td colspan="4">参数 (P) — 可调，校准或人工覆盖</td></tr>
+<tr><td>P01</td><td>总缺口 (GrossGap)</td><td>{{ gross_gap }} mbd</td><td>C01 × {{ disruption_rate }}</td></tr>
+<tr><td>P02</td><td>水中水雷</td><td>{{ mines_range }}</td><td>Uniform 分布</td></tr>
+<tr><td>P03</td><td>扫雷舰</td><td>{{ sweep_ships }} 艘</td><td>多国 MCM</td></tr>
 <tr><td>P04</td><td>管道替代</td><td>{{ pipeline_max }} mbd</td><td>ADCOP+沙特</td></tr>
+<tr><td>P05</td><td>管道爬坡周期</td><td>{{ pipeline_ramp }} 周</td><td>物理约束</td></tr>
 <tr><td>P06</td><td>SPR 释放率</td><td>{{ spr_rate }} mbd</td><td>DOE</td></tr>
 <tr><td>P07</td><td>SPR 延迟</td><td>{{ spr_delay }} 天</td><td>物理约束</td></tr>
-<tr><td>P10</td><td>有效中断率</td><td>{{ disruption_rate }}</td><td>校准</td></tr>
+<tr><td>P08</td><td>H3 悬置</td><td class="param-val">{{ h3_suspended }}</td><td>梅赫拉巴德机场摧毁</td></tr>
+<tr><td>P09</td><td>H3 先验</td><td>{{ h3_prior }}</td><td>重分配给 H1/H2</td></tr>
+<tr><td>P10</td><td>有效中断率</td><td>{{ disruption_rate }}</td><td>校准 (1984~70%, 2026~92%)</td></tr>
+<tr class="sec-group"><td colspan="4">M1 ACH — 贝叶斯推理</td></tr>
+<tr><td>—</td><td>先验</td><td>H1=H2=50% (H3 悬置时)</td><td>均匀先验+H3重分配</td></tr>
+<tr><td>—</td><td>似然比范围</td><td>{0.77, 0.95, 1.0, 1.05, 1.3}</td><td>强=1.3/0.77, 中=1.05/0.95</td></tr>
+<tr><td>—</td><td>后验上限</td><td>~95% (log-odds clamp)</td><td>防过度自信</td></tr>
+<tr><td>—</td><td>O05 T1a/T1b</td><td>GPS高+攻击↑=进攻H2 / GPS高+攻击↓=防御H2</td><td>解绑规则</td></tr>
+<tr class="sec-group"><td colspan="4">M3 Buffer 爬坡</td></tr>
+<tr><td>—</td><td>D1-D14 缓冲</td><td>1.5 mbd → 净缺口 ~14.5</td><td>管道初期</td></tr>
+<tr><td>—</td><td>D14+ 缓冲</td><td>7.0 mbd → 净缺口 ~9.0</td><td>管道+SPR+富查伊拉</td></tr>
+<tr><td>—</td><td>路径C崩溃</td><td>2.0 mbd → 净缺口 ~14</td><td>富查伊拉被击中</td></tr>
 <tr class="sec-group"><td colspan="4">M5 博弈层</td></tr>
 <tr><td>—</td><td>BASE_SENSITIVITY</td><td class="param-val">{{ base_sensitivity }}</td><td>全局灵敏度</td></tr>
 <tr><td>—</td><td>FOCAL_BONUS</td><td class="param-val">{{ focal_bonus }}</td><td>焦点收敛系数</td></tr>
 <tr class="sec-group"><td colspan="4">MC / 路径</td></tr>
-<tr><td>MC</td><td>采样数</td><td>N={{ mc_n }}</td><td>—</td></tr>
+<tr><td>—</td><td>采样数</td><td>N={{ mc_n }}</td><td>—</td></tr>
 <tr><td>—</td><td>路径边界</td><td>A&lt;35d / B=35-120d / C&gt;120d</td><td>PRD</td></tr>
-<tr class="sec-group"><td colspan="4">仓位</td></tr>
+<tr class="sec-group"><td colspan="4">仓位规则</td></tr>
 <tr><td>—</td><td>基础仓位</td><td>能源 15% / 波动 3% / 衰退 2%</td><td>PRD</td></tr>
 <tr><td>—</td><td>系统失效</td><td>Brent &lt; $80 × 3天 → 清仓</td><td>退出规则</td></tr>
 <tr><td>—</td><td>需求毁灭</td><td>Brent &gt; $150 → 清能源</td><td>退出规则</td></tr>
+<tr><td>—</td><td>最大亏损</td><td>8%</td><td>止损线</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<div class="sec-label">观测变量 (O01-O14)</div>
+<div class="card">
+<table>
+<tr><th>ID</th><th>名称</th><th>范围</th><th>ACH 作用</th></tr>
+<tr class="sec-group"><td colspan="4">A组 — 威胁状态 (喂入 ACH)</td></tr>
+<tr><td>O01</td><td>攻击频率</td><td>0-1</td><td>高→H2(0.95/1.05), 低→H1(1.05/0.95)</td></tr>
+<tr><td>O02</td><td>攻击趋势变化</td><td>0-1</td><td><b>强</b>: 高→H1(1.3/0.77), 低→H2(0.95/1.05)</td></tr>
+<tr><td>O03</td><td>攻击协调性</td><td>0-1</td><td><b>强</b>: 高→H2(0.77/1.3), 低→H1(1.3/0.77)</td></tr>
+<tr><td>O04</td><td>高端武器使用</td><td>0-1</td><td><b>强</b>: 高→H2(0.77/1.3), 低→H1(1.3/0.77)</td></tr>
+<tr><td>O05</td><td>GPS 欺骗复杂度</td><td>0-1</td><td>T1a/T1b 解绑（依赖 O01 趋势）</td></tr>
+<tr><td>O06</td><td>网络碎片化</td><td>0-1</td><td>高→H2(0.95/1.05), 低→H1(1.05/0.95)</td></tr>
+<tr class="sec-group"><td colspan="4">B组 — 封锁/恢复</td></tr>
+<tr><td>O07</td><td>战争险附加费</td><td>%</td><td>&gt;1%→H2, &lt;1%→H1</td></tr>
+<tr><td>O08</td><td>P&I 除外条款</td><td>0-1</td><td>高→H2(0.95/1.05), 低→H1(1.05/0.95)</td></tr>
+<tr><td>O09</td><td>VLCC 即期运费</td><td>WS点</td><td>&gt;150→elevated（不入ACH，校准参照）</td></tr>
+<tr><td>O10</td><td>海峡日通行量</td><td>0-1</td><td>高→H1(1.05/0.95), 低→H2(0.95/1.05)</td></tr>
+<tr class="sec-group"><td colspan="4">C组 — 缓冲到位</td></tr>
+<tr><td>O11</td><td>延布港装船量</td><td>0-1</td><td>高→H2(0.95/1.05)（管道分流代理）</td></tr>
+<tr><td>O12</td><td>富查伊拉-新加坡价差</td><td>$/mt</td><td>&gt;$50→物流崩溃（不入ACH）</td></tr>
+<tr><td>O13</td><td>SPR 释放率</td><td>mbd</td><td>&gt;1mbd→active（不入ACH）</td></tr>
+<tr class="sec-group"><td colspan="4">H3 解冻监控</td></tr>
+<tr><td>O14</td><td>未知武器类型</td><td>0-1</td><td>high confidence → 解冻H3（3-way ACH）</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<div class="sec-label">控制变量 (D01-D05)</div>
+<div class="card">
+<div style="font-size:12px;color:#94a3b8;">
+  行为者决策变量，事件驱动触发。triggered=true 时 effect 字段映射到 Schelling 信号（evidence=0.5）。
+</div>
+<table>
+<tr><th>字段</th><th>说明</th></tr>
+<tr><td>id</td><td>D01-D05 标识符</td></tr>
+<tr><td>actor</td><td>行为者（US / Iran / IRGC / mediator / …）</td></tr>
+<tr><td>triggered</td><td>是否激活（DB 手动标记）</td></tr>
+<tr><td>effect</td><td>→ Schelling 信号 key（如 costly_self_binding）</td></tr>
+</table>
+</div>
+</div>
+
+<div class="section">
+<div class="sec-label">校准参照 (R01-R03)</div>
+<div class="card">
+<table>
+<tr><th>ID</th><th>事件</th><th>年份</th><th>校准用途</th></tr>
+<tr><td>R01</td><td>Operation Praying Mantis</td><td>1988</td><td>Q1 主动干扰场景时长基线</td></tr>
+<tr><td>R02</td><td>海湾战争扫雷</td><td>1991</td><td>Q2 扫雷时间线校准</td></tr>
+<tr><td>R03</td><td>元山水雷封锁</td><td>1950</td><td>密集水雷场景上界（3000枚，2周延迟）</td></tr>
 </table>
 </div>
 </div>
@@ -535,9 +606,12 @@ def render_status(
         mines_range=f"{params.mines_in_water_range}",
         sweep_ships=params.sweep_ships,
         pipeline_max=f"{params.pipeline_max_mbd}",
+        pipeline_ramp=f"{params.pipeline_ramp_weeks}",
         spr_rate=f"{params.spr_rate_mean_mbd}",
         spr_delay=f"{params.spr_pump_min_days}",
         disruption_rate=f"{params.effective_disruption_rate}",
+        h3_suspended="是" if params.h3_suspended else "否",
+        h3_prior=f"{params.h3_prior}",
         mc_n=mc_n,
         flags=so.consistency_flags,
     )
