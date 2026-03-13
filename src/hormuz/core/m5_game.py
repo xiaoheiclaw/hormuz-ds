@@ -1,29 +1,36 @@
 """M5: Game theory path weight adjuster — PRD §6.
 
-Schelling signal deltas applied additively, then normalize + clip.
-6 signals from constants.yaml, cap ±10pp per signal.
+Schelling signal multipliers applied sequentially, then normalize + clip.
+Multiplicative logic: consistent relative impact regardless of base weight.
 """
 
 from __future__ import annotations
 
 from hormuz.core.types import ACHPosterior, PathWeights
 
-# PRD §6 Schelling signal table (from constants.yaml)
-# id → signal_key mapping:
-#   S1: external_mediation    — third-party mediation (Oman, Qatar, China)
-#   S2: us_inconsistency      — contradictory US messaging
-#   S3: costly_self_binding   — costly commitment to de-escalation
-#   S4: irgc_escalation       — IRGC infrastructure escalation (cross-layer E1)
-#   S5: peace_window          — diplomatic window (requires S1+S3 combo)
-#   S6: irgc_fragmentation    — IRGC internal disagreement (requires S2 combo)
+# PRD §6 Schelling signal table
+# Multipliers: >1 = more likely, <1 = less likely
+# e.g., a=1.3 means "A path becomes 30% more likely"
+#
+# Design principles:
+#   - Multiplicative: same signal = same relative impact at any base
+#   - Combo signals stronger than prerequisites (higher evidence bar → bigger payoff)
+#   - Escalation signals have larger multipliers than de-escalation (bad news > good news)
+#   - B is explicitly targeted, not just residual
 
-_SIGNAL_DELTAS: dict[str, dict[str, float]] = {
-    "external_mediation":   {"a": +0.05, "b":  0.00, "c": -0.03},
-    "us_inconsistency":     {"a": +0.03, "b":  0.00, "c":  0.00},
-    "costly_self_binding":  {"a": +0.05, "b":  0.00, "c":  0.00},
-    "irgc_escalation":      {"a": -0.05, "b":  0.00, "c": +0.10},
-    "peace_window":         {"a": +0.03, "b":  0.00, "c":  0.00},
-    "irgc_fragmentation":   {"a": +0.02, "b":  0.00, "c":  0.00},
+_SIGNAL_MULTIPLIERS: dict[str, dict[str, float]] = {
+    # S1: third-party mediation (Oman, Qatar, China)
+    "external_mediation":   {"a": 1.25, "b": 1.05, "c": 0.80},
+    # S2: contradictory US messaging — uncertainty increases B and C
+    "us_inconsistency":     {"a": 1.05, "b": 1.10, "c": 1.05},
+    # S3: costly commitment to de-escalation
+    "costly_self_binding":  {"a": 1.30, "b": 1.00, "c": 0.80},
+    # S4: IRGC infrastructure escalation — strongest signal
+    "irgc_escalation":      {"a": 0.70, "b": 0.85, "c": 1.60},
+    # S5: diplomatic window (combo: mediation + self_binding)
+    "peace_window":         {"a": 1.50, "b": 0.90, "c": 0.60},
+    # S6: IRGC internal disagreement (combo: us_inconsistency)
+    "irgc_fragmentation":   {"a": 1.30, "b": 1.10, "c": 0.75},
 }
 
 # Combo requirements: signal requires all listed prerequisites to be active
@@ -31,9 +38,6 @@ _COMBO_REQUIRES: dict[str, list[str]] = {
     "peace_window": ["external_mediation", "costly_self_binding"],
     "irgc_fragmentation": ["us_inconsistency"],
 }
-
-# Max absolute delta per signal application (PRD: 10pp)
-_DELTA_CAP = 0.10
 
 
 def ach_to_base_weights(posterior: ACHPosterior) -> PathWeights:
@@ -54,10 +58,10 @@ def adjust_path_weights(
     base: PathWeights,
     active_signals: list[str],
 ) -> PathWeights:
-    """Apply signal deltas sequentially, normalize + clip after each.
+    """Apply signal multipliers sequentially, normalize + clip after each.
 
-    Combo signals (peace_window, irgc_fragmentation) only fire if
-    their prerequisites are also in active_signals.
+    Multiplicative: weight *= multiplier, then renormalize.
+    Combo signals only fire if prerequisites are also in active_signals.
     """
     if not active_signals:
         return base
@@ -66,8 +70,8 @@ def adjust_path_weights(
 
     current = base
     for signal in active_signals:
-        delta = _SIGNAL_DELTAS.get(signal)
-        if delta is None:
+        mults = _SIGNAL_MULTIPLIERS.get(signal)
+        if mults is None:
             continue
 
         # Check combo prerequisites
@@ -76,9 +80,9 @@ def adjust_path_weights(
             continue
 
         raw = PathWeights(
-            a=current.a + delta["a"],
-            b=current.b + delta["b"],
-            c=current.c + delta["c"],
+            a=current.a * mults["a"],
+            b=current.b * mults["b"],
+            c=current.c * mults["c"],
         )
         current = raw.normalized()
 

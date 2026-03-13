@@ -229,17 +229,17 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
   </div></div>
   <div class="col"><div class="card">
     <div class="card-title">Schelling 信号 & 路径调节</div>
-    <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">delta 调节后归一化 + clip [5%, 85%]</div>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">乘数调节后归一化 + clip [5%, 85%]</div>
     {% if game_signals %}
     <table>
-      <tr><th>信号</th><th>A</th><th>C</th></tr>
+      <tr><th>信号</th><th>A</th><th>B</th><th>C</th></tr>
       {% for gs in game_signals %}
+      {% set m = signal_mults.get(gs, {}) %}
       <tr>
         <td>{{ signal_names.get(gs, gs) }}</td>
-        <td class="{{ 'green' if signal_deltas.get(gs, {}).get('a', 0) > 0 else 'red' if signal_deltas.get(gs, {}).get('a', 0) < 0 else 'grey' }}">
-          {{ "%+.0f"|format(signal_deltas.get(gs, {}).get('a', 0) * 100) }}pp</td>
-        <td class="{{ 'red' if signal_deltas.get(gs, {}).get('c', 0) > 0 else 'green' if signal_deltas.get(gs, {}).get('c', 0) < 0 else 'grey' }}">
-          {{ "%+.0f"|format(signal_deltas.get(gs, {}).get('c', 0) * 100) }}pp</td>
+        <td class="{{ 'green' if m.get('a', 1) > 1 else 'red' if m.get('a', 1) < 1 else 'grey' }}">×{{ "%.2f"|format(m.get('a', 1)) }}</td>
+        <td class="{{ 'green' if m.get('b', 1) > 1 else 'red' if m.get('b', 1) < 1 else 'grey' }}">×{{ "%.2f"|format(m.get('b', 1)) }}</td>
+        <td class="{{ 'red' if m.get('c', 1) > 1 else 'green' if m.get('c', 1) < 1 else 'grey' }}">×{{ "%.2f"|format(m.get('c', 1)) }}</td>
       </tr>
       {% endfor %}
     </table>
@@ -487,13 +487,13 @@ def render_status(
             "peace_window": "和平窗口",
             "irgc_fragmentation": "IRGC 内部分裂",
         },
-        signal_deltas={
-            "external_mediation":  {"a": +0.05, "c": -0.03},
-            "us_inconsistency":    {"a": +0.03, "c":  0.00},
-            "costly_self_binding": {"a": +0.05, "c":  0.00},
-            "irgc_escalation":     {"a": -0.05, "c": +0.10},
-            "peace_window":        {"a": +0.03, "c":  0.00},
-            "irgc_fragmentation":  {"a": +0.02, "c":  0.00},
+        signal_mults={
+            "external_mediation":  {"a": 1.25, "b": 1.05, "c": 0.80},
+            "us_inconsistency":    {"a": 1.05, "b": 1.10, "c": 1.05},
+            "costly_self_binding": {"a": 1.30, "b": 1.00, "c": 0.80},
+            "irgc_escalation":     {"a": 0.70, "b": 0.85, "c": 1.60},
+            "peace_window":        {"a": 1.50, "b": 0.90, "c": 0.60},
+            "irgc_fragmentation":  {"a": 1.30, "b": 1.10, "c": 0.75},
         },
         # Section 7: positions
         pos_energy=pos_energy,

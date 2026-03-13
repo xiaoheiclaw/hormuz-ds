@@ -75,3 +75,18 @@ def test_unknown_signal_ignored():
     base = PathWeights()
     result = adjust_path_weights(base, active_signals=["unknown_signal_xyz"])
     assert result.a == pytest.approx(base.a)
+
+
+def test_multiplicative_consistent_relative_impact():
+    """Same signal should have same relative impact at different base weights."""
+    from hormuz.core.m5_game import adjust_path_weights
+    low_a = PathWeights(a=0.10, b=0.70, c=0.20)
+    high_a = PathWeights(a=0.40, b=0.40, c=0.20)
+
+    r_low = adjust_path_weights(low_a, ["external_mediation"])
+    r_high = adjust_path_weights(high_a, ["external_mediation"])
+
+    # Relative change in A should be similar (not identical due to normalization)
+    ratio_low = r_low.a / low_a.a
+    ratio_high = r_high.a / high_a.a
+    assert abs(ratio_low - ratio_high) < 0.15  # roughly consistent
