@@ -301,7 +301,7 @@ async def run_pipeline(config: dict) -> dict:
     # Step 6: Report generation
     try:
         from hormuz.app.reporter import render_status
-        report_path = Path(config.get("report_output", "data/status.html"))
+        report_path = Path(config.get("report_output", "docs/index.html"))
         render_status(
             system_output=so,
             mc_result=mc_result,
