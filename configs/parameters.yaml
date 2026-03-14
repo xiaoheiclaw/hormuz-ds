@@ -24,7 +24,7 @@ physical:
   q3:
     pipeline_max_mbd: 4.0
     pipeline_ramp_weeks: 2.5
-    spr_rate_mean_mbd: 2.5
+    spr_rate_mean_mbd: 2.0
     spr_delay_weeks: 2.5
     surplus_buffer_mbd: 2.5
 

@@ -81,6 +81,24 @@ CREATE TABLE IF NOT EXISTS parameters_override (
     new_value TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS articles (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    source TEXT,
+    url TEXT,
+    summary TEXT,
+    published_date TEXT,
+    fetched_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS article_observations (
+    article_id TEXT,
+    obs_id TEXT,
+    confidence TEXT,
+    batch_run TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -377,3 +395,66 @@ def get_pending_signals(path: Path) -> list[dict]:
     ).fetchall()
     conn.close()
     return [{"signal_type": r[0], "action": r[1], "created_at": r[2]} for r in rows]
+
+
+# ── Articles & provenance ────────────────────────────────────────────
+
+def insert_articles(path: Path, articles: list[dict]) -> None:
+    """Store articles, skip duplicates by ID (INSERT OR IGNORE)."""
+    conn = sqlite3.connect(path)
+    conn.executemany(
+        "INSERT OR IGNORE INTO articles (id, title, source, url, summary, published_date) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            (a["id"], a.get("title", ""), a.get("source", ""), a.get("url", ""),
+             a.get("summary", "")[:3000], a.get("published_date"))
+            for a in articles if a.get("id")
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_article_ids(path: Path, candidate_ids: set[str]) -> set[str]:
+    """Return subset of candidate_ids that already exist in DB."""
+    if not candidate_ids:
+        return set()
+    conn = sqlite3.connect(path)
+    placeholders = ",".join("?" for _ in candidate_ids)
+    rows = conn.execute(
+        f"SELECT id FROM articles WHERE id IN ({placeholders})",
+        list(candidate_ids),
+    ).fetchall()
+    conn.close()
+    return {r[0] for r in rows}
+
+
+def insert_article_observations(path: Path, mappings: list[dict], batch_run: str = "") -> None:
+    """Store article→observation provenance links."""
+    conn = sqlite3.connect(path)
+    conn.executemany(
+        "INSERT INTO article_observations (article_id, obs_id, confidence, batch_run) VALUES (?, ?, ?, ?)",
+        [(m["article_id"], m["obs_id"], m.get("confidence", ""), batch_run) for m in mappings],
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_article_observations(
+    path: Path, obs_id: str | None = None, batch_run: str | None = None,
+) -> list[dict]:
+    """Query article→observation provenance, optionally filtered."""
+    conn = sqlite3.connect(path)
+    query = "SELECT article_id, obs_id, confidence, batch_run, created_at FROM article_observations WHERE 1=1"
+    params: list = []
+    if obs_id:
+        query += " AND obs_id = ?"
+        params.append(obs_id)
+    if batch_run:
+        query += " AND batch_run = ?"
+        params.append(batch_run)
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [
+        {"article_id": r[0], "obs_id": r[1], "confidence": r[2], "batch_run": r[3], "created_at": r[4]}
+        for r in rows
+    ]

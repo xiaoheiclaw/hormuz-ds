@@ -29,6 +29,7 @@ from hormuz.core.mc import MCResult, run_monte_carlo
 # These are imported for run_pipeline but may be mocked in tests
 from hormuz.infra.ingester import fetch_readwise_articles, fetch_market_data, fetch_spr_release, fetch_bunker_spread, get_calibration_data, bwet_to_vlcc_obs, parse_readwise_articles
 from hormuz.infra.analyzer import extract_observations
+from hormuz.infra.db import insert_articles, get_article_ids, insert_article_observations
 
 
 def engine_run(
@@ -217,14 +218,32 @@ async def run_pipeline(config: dict) -> dict:
         backend_type = llm_config.get("backend", "claude_api")
         backend_kwargs = llm_config.get(backend_type, {})
         llm = create_llm_backend(backend_type, **backend_kwargs)
-        parsed = parse_readwise_articles(articles)[:30]
-        extraction = await extract_observations(
-            parsed, llm=llm, batch_size=5,
-            conflict_day=conflict_day,
-            previous_obs=previous_obs,
-        )
-        llm_obs = extraction.observations
-        llm_signals = extraction.signals
+        parsed = parse_readwise_articles(articles)
+
+        # Dedup: skip articles already processed in DB
+        candidate_ids = {a["id"] for a in parsed if a.get("id")}
+        existing_ids = get_article_ids(db_path, candidate_ids) if candidate_ids else set()
+        new_parsed = [a for a in parsed if a.get("id") not in existing_ids]
+
+        if new_parsed:
+            extraction = await extract_observations(
+                new_parsed, llm=llm, batch_size=5,
+                conflict_day=conflict_day,
+                previous_obs=previous_obs,
+            )
+            llm_obs = extraction.observations
+            llm_signals = extraction.signals
+
+            # Store articles and provenance
+            batch_run = datetime.now().strftime("%Y%m%d-%H%M%S")
+            insert_articles(db_path, new_parsed)
+            if extraction.provenance:
+                insert_article_observations(db_path, extraction.provenance, batch_run=batch_run)
+        else:
+            llm_obs = []
+
+        result["articles_total"] = len(parsed)
+        result["articles_new"] = len(new_parsed)
         result["steps_completed"] += 1
     except Exception as e:
         result["errors"].append(f"Step 2 LLM: {e}")

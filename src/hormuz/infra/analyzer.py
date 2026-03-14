@@ -46,9 +46,12 @@ O02 — attack_trend_change: are attacks rising, stable, or declining vs recent 
 
 O03 — attack_coordination: tactical complexity and sophistication of recent Iran/IRGC operations.
   0=no organized attacks/amateur, 0.5=some coordination, 1.0=multi-platform synchronized operations
+  IMPORTANT: If articles describe an active war with ongoing military operations, coordination is NOT zero.
+  Any organized military campaign implies at least 0.3-0.5. Only give 0 if attacks are truly random/amateur.
   News phrases: "coordinated multi-axis attack", "simultaneous strikes from multiple directions",
   "isolated lone-wolf attack", "sophisticated swarming tactics",
-  "multi-vector assault", "combined drone and missile strike"
+  "multi-vector assault", "combined drone and missile strike",
+  "war", "military campaign", "offensive operations" (implies at least moderate coordination)
 
 O04 — advanced_weapon_use: ratio of high-end weapons (ASCM/ASBM/cruise missiles/ballistic) vs low-end (drones/FIAC/unguided).
   0=only crude/cheap weapons, 0.5=mixed, 1.0=exclusively advanced missiles
@@ -70,9 +73,15 @@ O06 — network_fragmentation: geographic distribution of IRGC operational capab
 ## B-GROUP: Blockade/Recovery (0-1 scale except O07, O09)
 
 O07 — war_risk_insurance_premium: hull war risk additional premium as % of vessel value.
-  Give actual percentage (e.g., 2.5 = 2.5%). Normal peacetime <0.1%, crisis 1-5%.
+  Give actual percentage (e.g., 2.5 = 2.5%). Calibration anchors:
+  - Normal peacetime Persian Gulf: 0.05-0.07%
+  - Red Sea Houthi crisis (2024): 0.4-0.5%
+  - Full war / strait closed: 5-10%+ (or commercial insurance unavailable)
+  If articles mention government war risk backstop/guarantee program, AP is likely >5%.
+  If no specific number in articles, estimate from crisis severity — do NOT default to 0.
   News phrases: "war risk premium surged to X%", "insurance costs soared", "AP quoted at X%",
-  "hull war risk", "underwriters raised rates"
+  "hull war risk", "underwriters raised rates", "government war risk backstop",
+  "DFC war risk facility", "insurers refuse to quote"
 
 O08 — pni_exclusion: P&I club war risk coverage status.
   0=normal coverage, 0.3=surcharges added, 0.7=72h cancellation notice triggered, 1.0=full exclusion/per-voyage only
@@ -102,9 +111,12 @@ O12 — fujairah_singapore_spread: fuel oil price spread between Fujairah and Si
   "Fujairah storage hub disrupted", "bunkering prices spiked"
 
 O13 — spr_release_rate: actual SPR release rate in million barrels/day.
-  Give mbd value (e.g., 1.5). Zero until release order + 13-day pump delay.
+  Give mbd value (e.g., 1.5). IMPORTANT: This is PHYSICAL barrels flowing, not announcements.
+  "Announced but not yet pumping" = 0. Only nonzero when barrels are physically being released.
+  There is a ~13-day delay between release order and first physical delivery.
   News phrases: "DOE released X million barrels", "SPR drawdown of X mbd",
-  "strategic reserve release authorized", "emergency oil release"
+  "barrels flowing from SPR", "physical deliveries began"
+  NOT counted: "President authorized SPR release" (announced, not yet flowing)
 
 ## A6: H3 UNFREEZE MONITOR
 
@@ -177,9 +189,10 @@ def build_extraction_prompt(conflict_day: int | None = None, previous_obs: dict[
 
 @dataclass
 class ExtractionResult:
-    """Combined extraction output: observations + Schelling signals."""
+    """Combined extraction output: observations + Schelling signals + provenance."""
     observations: list[Observation] = field(default_factory=list)
     signals: list[SignalEvidence] = field(default_factory=list)
+    provenance: list[dict] = field(default_factory=list)
 
 
 async def _extract_batch(
@@ -188,7 +201,7 @@ async def _extract_batch(
     ts: datetime,
     conflict_day: int | None = None,
     previous_obs: dict[str, float] | None = None,
-) -> tuple[list[Observation], list[SignalEvidence]]:
+) -> tuple[list[Observation], list[SignalEvidence], list[dict]]:
     """Extract observations and signals from a single batch of articles."""
     text_parts = []
     for a in articles:
@@ -198,14 +211,20 @@ async def _extract_batch(
     prompt = build_extraction_prompt(conflict_day=conflict_day, previous_obs=previous_obs)
     result = await llm.extract(text, prompt)
 
+    article_ids = [str(a.get("id", "")) for a in articles if a.get("id")]
+
     observations = []
+    provenance: list[dict] = []
     for item in result.get("observations", []):
+        conf = item.get("confidence", "unknown")
         observations.append(Observation(
             id=item["id"],
             timestamp=ts,
             value=float(item["value"]),
-            source=f"llm:{item.get('confidence', 'unknown')}",
+            source=f"llm:{conf}",
         ))
+        for aid in article_ids:
+            provenance.append({"article_id": aid, "obs_id": item["id"], "confidence": conf})
 
     raw_signals = result.get("signals", [])
     if not isinstance(raw_signals, list):
@@ -221,7 +240,6 @@ async def _extract_batch(
             key = s.get("key", "")
             evidence = _EVIDENCE_MAP.get(s.get("evidence", "low"), 0.2)
         elif isinstance(s, str):
-            # Backwards compat: plain string → default medium evidence
             key = s
             evidence = 0.5
         else:
@@ -229,7 +247,7 @@ async def _extract_batch(
         if key in valid_keys:
             signals.append(SignalEvidence(key=key, evidence=evidence))
 
-    return observations, signals
+    return observations, signals, provenance
 
 
 async def extract_observations(
@@ -254,18 +272,26 @@ async def extract_observations(
     # Process in batches
     all_obs: list[Observation] = []
     all_signals: list[SignalEvidence] = []
+    all_provenance: list[dict] = []
+    import asyncio as _aio
+
     for i in range(0, len(articles), batch_size):
         batch = articles[i : i + batch_size]
-        try:
-            batch_obs, batch_sigs = await _extract_batch(
-                batch, llm, ts,
-                conflict_day=conflict_day,
-                previous_obs=previous_obs,
-            )
-            all_obs.extend(batch_obs)
-            all_signals.extend(batch_sigs)
-        except Exception:
-            continue  # skip failed batch
+        for attempt in range(3):
+            try:
+                batch_obs, batch_sigs, batch_prov = await _extract_batch(
+                    batch, llm, ts,
+                    conflict_day=conflict_day,
+                    previous_obs=previous_obs,
+                )
+                all_obs.extend(batch_obs)
+                all_signals.extend(batch_sigs)
+                all_provenance.extend(batch_prov)
+                break
+            except Exception:
+                if attempt < 2:
+                    await _aio.sleep(2 ** attempt)
+                # 3rd attempt failed → skip batch
 
     # Deduplicate observations: keep highest-confidence per obs ID
     _conf_rank = {"high": 3, "medium": 2, "low": 1, "unknown": 0}
@@ -287,4 +313,5 @@ async def extract_observations(
     return ExtractionResult(
         observations=[obs for obs, _ in best.values()],
         signals=list(best_sigs.values()),
+        provenance=all_provenance,
     )

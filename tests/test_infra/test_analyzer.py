@@ -54,6 +54,33 @@ async def test_extract_dedup_signals_keeps_highest_evidence():
     assert result.signals[0].evidence == 1.0  # high wins
 
 
+@pytest.mark.asyncio
+async def test_extract_returns_provenance():
+    """ExtractionResult includes article→observation provenance mappings."""
+    from hormuz.infra.analyzer import extract_observations
+    mock_llm = AsyncMock()
+    mock_llm.extract.return_value = {
+        "observations": [
+            {"id": "O01", "value": 0.7, "confidence": "high"},
+            {"id": "O03", "value": 0.5, "confidence": "medium"},
+        ],
+        "signals": [],
+    }
+    articles = [
+        {"id": "art-100", "title": "Gulf attacks", "summary": "IRGC strikes", "source": "Reuters"},
+        {"id": "art-101", "title": "Oil surge", "summary": "Brent up", "source": "OilPrice"},
+    ]
+    result = await extract_observations(articles, llm=mock_llm, batch_size=5)
+    assert len(result.observations) == 2
+    # provenance: each obs linked to the articles in its batch
+    assert len(result.provenance) >= 2
+    # Each entry has article_id, obs_id, confidence
+    entry = result.provenance[0]
+    assert "article_id" in entry
+    assert "obs_id" in entry
+    assert "confidence" in entry
+
+
 def test_llm_factory():
     from hormuz.infra.llm import create_llm_backend
     backend = create_llm_backend(backend_type="claude_api", model="claude-sonnet-4-6", api_key="test")
