@@ -28,16 +28,20 @@ Return JSON only:
 }}
 
 ## A-GROUP: Threat Status (feed ACH engine, 0-1 scale)
-## IMPORTANT: These cover ALL Iran/IRGC military activity in the Gulf region,
-## not just attacks on strait shipping. Include attacks on oil infrastructure,
-## ports, Gulf states, and general Iran military operations.
+## IMPORTANT: These cover ALL Iran/IRGC/proxy military activity across ALL fronts,
+## not just the Gulf. Include: Gulf shipping, oil infrastructure, Gulf states,
+## US/allied bases, Israel, Lebanon, proxy operations (Hezbollah, Iraqi militias).
 
-O01 — attack_frequency: Iran/IRGC military attacks in the Gulf/Hormuz region in past 24h.
-  Include: attacks on shipping, oil infrastructure, Gulf state territory, drone/missile strikes on ports.
-  0=no attacks anywhere in region, 0.3=sporadic (1-2/day), 0.5=moderate (3-5/day), 0.8=heavy (6+/day), 1.0=saturated/continuous
+O01 — attack_frequency: ALL Iran/IRGC/proxy military attacks globally in past 24h.
+  Include: attacks on shipping, oil infrastructure, Gulf states, US/allied bases (Iraq/Bahrain/Qatar/Kuwait),
+  strikes on Israel, Hezbollah attacks on Israel, proxy attacks (Iraqi militias, Houthis),
+  drone/missile strikes on ports, airports, embassies, civilian areas.
+  Count ALL fronts: Gulf/Hormuz + Israel + Lebanon + Iraq + Mediterranean.
+  0=no attacks anywhere, 0.3=sporadic (1-2/day), 0.5=moderate (3-5/day), 0.8=heavy (6+/day), 1.0=saturated/continuous multi-front
   News phrases: "CENTCOM reported X attacks", "no incidents reported", "surge in attacks",
   "drone strike on port", "oil terminal attacked", "missiles fired at Saudi/UAE/Oman",
-  "attacks on merchant vessels", "Gulf under wave of attacks"
+  "attacks on merchant vessels", "Gulf under wave of attacks",
+  "Hezbollah rockets hit Israel", "Iranian missiles at Tel Aviv", "proxy attacks on US bases"
 
 O02 — attack_trend_change: are attacks rising, stable, or declining vs recent days?
   0=sharp rise/new escalation, 0.5=stable/no change, 1.0=sharp decline
