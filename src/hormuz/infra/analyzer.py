@@ -45,10 +45,7 @@ O01 — attack_frequency: ALL Iran/IRGC/proxy military attacks globally in past 
   "attacks on merchant vessels", "Gulf under wave of attacks",
   "Hezbollah rockets hit Israel", "Iranian missiles at Tel Aviv", "proxy attacks on US bases"
 
-O02 — attack_trend_change: are attacks rising, stable, or declining vs recent days?
-  0=sharp rise/new escalation, 0.5=stable/no change, 1.0=sharp decline
-  News phrases: "attacks dropped 50%", "lull in hostilities", "3 days without incident",
-  "renewed wave of attacks", "escalation in frequency", "both sides dig in"
+O02 — SKIP. Do NOT extract O02. It is computed automatically from O01 history.
 
 O03 — attack_coordination: tactical complexity and sophistication of recent Iran/IRGC operations.
   0=no organized attacks/amateur, 0.5=some coordination, 1.0=multi-platform synchronized operations
@@ -116,13 +113,18 @@ O12 — fujairah_singapore_spread: fuel oil price spread between Fujairah and Si
   News phrases: "Fujairah premium surged", "fuel oil spread widened to $X",
   "Fujairah storage hub disrupted", "bunkering prices spiked"
 
-O13 — spr_release_rate: actual SPR release rate in million barrels/day.
-  Give mbd value (e.g., 1.5). IMPORTANT: This is PHYSICAL barrels flowing, not announcements.
-  "Announced but not yet pumping" = 0. Only nonzero when barrels are physically being released.
-  There is a ~13-day delay between release order and first physical delivery.
-  News phrases: "DOE released X million barrels", "SPR drawdown of X mbd",
-  "barrels flowing from SPR", "physical deliveries began"
-  NOT counted: "President authorized SPR release" (announced, not yet flowing)
+O13 — spr_release_rate: actual SPR PHYSICAL release rate in million barrels/day (mbd).
+  CRITICAL DISTINCTION — you MUST understand the difference:
+  - "IEA released 400 million barrels from reserves" = TOTAL VOLUME authorized, NOT a daily rate. Do NOT use this as O13.
+  - "SPR releasing at 1.5 mbd" = DAILY FLOW RATE. This IS O13.
+  - To convert: if only total volume is mentioned, you CANNOT determine O13 without knowing the time period.
+  - "Announced/authorized/ordered release" with no mention of physical pumping = 0.
+  - There is a ~13-day delay between release order and first physical delivery.
+  - 2022 US SPR peak physical rate was ~1.0 mbd. Values above 2.0 mbd are extremely unlikely.
+  - If articles only mention total barrels released (e.g., "400 million barrels"), give O13 = 0 unless
+    they ALSO confirm physical barrels are flowing at a specific daily rate.
+  News phrases that ARE O13: "SPR drawdown of X mbd", "barrels flowing from SPR at X/day"
+  News phrases that are NOT O13: "released 400M barrels" (total), "authorized SPR release" (announcement)
 
 ## A6: H3 UNFREEZE MONITOR
 
