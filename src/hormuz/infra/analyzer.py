@@ -37,7 +37,9 @@ O01 — attack_frequency: ALL Iran/IRGC/proxy military attacks globally in past 
   strikes on Israel, Hezbollah attacks on Israel, proxy attacks (Iraqi militias, Houthis),
   drone/missile strikes on ports, airports, embassies, civilian areas.
   Count ALL fronts: Gulf/Hormuz + Israel + Lebanon + Iraq + Mediterranean.
-  0=no attacks anywhere, 0.3=sporadic (1-2/day), 0.5=moderate (3-5/day), 0.8=heavy (6+/day), 1.0=saturated/continuous multi-front
+  0=no attacks anywhere, 0.2=isolated (1-2/day single front), 0.3=sporadic (3-5/day),
+  0.5=moderate (6-10/day across multiple fronts), 0.7=heavy (11-15/day), 0.8=intense (15-25/day multi-front),
+  0.9=near-saturated (25+/day), 1.0=saturated/continuous all-front barrage
   News phrases: "CENTCOM reported X attacks", "no incidents reported", "surge in attacks",
   "drone strike on port", "oil terminal attacked", "missiles fired at Saudi/UAE/Oman",
   "attacks on merchant vessels", "Gulf under wave of attacks",
