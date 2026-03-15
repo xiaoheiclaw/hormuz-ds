@@ -41,10 +41,15 @@ O01 — attack_frequency: ALL Iran/IRGC/proxy military attacks globally in past 
   0=no attacks anywhere, 0.2=isolated (1-2/day single front), 0.3=sporadic (3-5/day),
   0.5=moderate (6-10/day across multiple fronts), 0.7=heavy (11-15/day), 0.8=intense (15-25/day multi-front),
   0.9=near-saturated (25+/day), 1.0=saturated/continuous all-front barrage
+  IMPORTANT: Named/numbered operations are strong anchors. "Iran's Nth retaliation" (第N次反击/
+  Operation True Promise N) gives precise operation count — extract the number and use interval
+  between operations to calibrate frequency. E.g., 3 named operations in 14 days ≈ one every 5 days
+  = sustained but not saturating ≈ O01=0.5-0.6. If interval is shrinking, that's escalation signal.
   News phrases: "CENTCOM reported X attacks", "no incidents reported", "surge in attacks",
   "drone strike on port", "oil terminal attacked", "missiles fired at Saudi/UAE/Oman",
   "attacks on merchant vessels", "Gulf under wave of attacks",
-  "Hezbollah rockets hit Israel", "Iranian missiles at Tel Aviv", "proxy attacks on US bases"
+  "Hezbollah rockets hit Israel", "Iranian missiles at Tel Aviv", "proxy attacks on US bases",
+  "Iran's Xth retaliation", "Operation True Promise", "第X次反击", "armed retaliation #X"
 
 O02 — SKIP. Do NOT extract O02. It is computed automatically from O01 history.
 
