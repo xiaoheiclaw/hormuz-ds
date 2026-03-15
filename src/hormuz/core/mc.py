@@ -55,6 +55,7 @@ def run_monte_carlo(
     posterior: ACHPosterior,
     params: Parameters,
     events: dict[str, bool],
+    mine_signals: dict[str, float] | None = None,
     n: int = 10000,
     seed: int | None = None,
     spr_trigger_day: int | None = None,
@@ -69,7 +70,9 @@ def run_monte_carlo(
 
     # Sample T1, T2, T_total via M2 (includes regime jumps)
     mc_seed = int(rng.integers(0, 2**31))
-    t1, t2, t_total = estimate_t_total(posterior, params, events, n=n, seed=mc_seed)
+    t1, t2, t_total = estimate_t_total(
+        posterior, params, events, mine_signals=mine_signals, n=n, seed=mc_seed,
+    )
 
     # Pre-compute buffer trajectory — at least 181 days for Path C gap integration
     max_t = max(181, int(np.ceil(np.max(t_total))) + 1)

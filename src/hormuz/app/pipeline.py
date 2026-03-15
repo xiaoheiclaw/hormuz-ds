@@ -62,9 +62,16 @@ def engine_run(
     state = StateVector(effective_disruption=params.effective_disruption_rate)
     gross_gap = compute_gross_gap(constants, state)
 
+    # Extract mine-related signals from observations for T2 conditioning
+    mine_signals: dict[str, float] = {}
+    for o in observations:
+        if o.id in ("O03", "O10"):
+            mine_signals[o.id] = o.value
+
     # MC simulation: single source for T1/T2/T_total samples + buffer trajectory
     mc_result = run_monte_carlo(
-        posterior, params, events, n=mc_n, seed=seed,
+        posterior, params, events, mine_signals=mine_signals,
+        n=mc_n, seed=seed,
         spr_trigger_day=spr_trigger_day,
         gross_gap_mbd=gross_gap,
     )

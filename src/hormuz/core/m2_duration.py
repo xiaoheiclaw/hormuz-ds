@@ -68,45 +68,49 @@ def estimate_t1(posterior: ACHPosterior, n: int = 10000, seed: int | None = None
 def estimate_t2(
     params: Parameters,
     events: dict[str, bool],
-    posterior: ACHPosterior | None = None,
+    mine_signals: dict[str, float] | None = None,
     n: int = 10000,
     seed: int | None = None,
 ) -> np.ndarray:
     """Sample T2: mine clearance time via stock-flow model.
 
-    mines_in_water conditioned on ACH:
-      H1 (exhaustion): 15-50 — mining capability degraded
-      H2 (preserved):  40-120 — sustained mining, higher stock
-      H3 (resupply):   50-150 — external supply of advanced mines
-    Fallback: params.mines_in_water_range (20-100) if no posterior.
+    mines_in_water range adjusted by observed mine-related signals:
+      O03 (attack coordination) high → more mines likely, shift range up
+      O10 (transit volume) low → mines blocking shipping, shift range up
+      E3 (mine strike) → confirmed mines present, raise floor
+      C2 (re-mining cleared lane) → active replenishment, raise ceiling
 
+    Base range from params.mines_in_water_range (default 20-100).
     sweep_time = mines / (ships × rate_per_ship).
     Add event jumps for E2/E3/C2.
     """
     rng = np.random.default_rng(seed)
+    lo, hi = params.mines_in_water_range
 
-    # ACH-conditioned mine counts
-    if posterior is not None:
-        h3_w = posterior.h3 if posterior.h3 is not None else 0.0
-        total_w = posterior.h1 + posterior.h2 + h3_w
-        if total_w == 0:
-            total_w = 1.0
-        w_h1 = posterior.h1 / total_w
-        w_h2 = posterior.h2 / total_w
+    # Adjust range based on observed data
+    if mine_signals:
+        # O03 high (>0.6): coordinated attacks suggest active mining capability
+        o03 = mine_signals.get("O03", 0.5)
+        if o03 > 0.6:
+            lo = lo + int((o03 - 0.6) * 50)   # up to +20 at o03=1.0
+            hi = hi + int((o03 - 0.6) * 75)   # up to +30 at o03=1.0
 
-        u = rng.random(n)
-        mask_h1 = u < w_h1
-        mask_h2 = (u >= w_h1) & (u < w_h1 + w_h2)
-        mask_h3 = ~mask_h1 & ~mask_h2
+        # O10 low (<0.2): transit near-zero = heavy mining probable
+        o10 = mine_signals.get("O10", 0.5)
+        if o10 < 0.2:
+            lo = lo + int((0.2 - o10) * 100)  # up to +20 at o10=0
+            hi = hi + int((0.2 - o10) * 150)  # up to +30 at o10=0
 
-        mines = np.empty(n)
-        mines[mask_h1] = rng.uniform(15, 50, mask_h1.sum())
-        mines[mask_h2] = rng.uniform(40, 120, mask_h2.sum())
-        if mask_h3.any():
-            mines[mask_h3] = rng.uniform(50, 150, mask_h3.sum())
-    else:
-        lo, hi = params.mines_in_water_range
-        mines = rng.uniform(lo, hi, n)
+        # E3 confirmed: mines are definitely present, raise floor
+        if events.get("E3"):
+            lo = max(lo, 40)
+
+        # C2 confirmed: active replenishment, raise both
+        if events.get("C2"):
+            lo = max(lo, 50)
+            hi = max(hi, 150)
+
+    mines = rng.uniform(lo, hi, n)
 
     # Sweep rate: ~0.5 mines/day/ship, uncertain (0.3-0.8 range)
     rate_per_ship = rng.uniform(0.3, 0.8, n)
@@ -131,6 +135,7 @@ def estimate_t_total(
     posterior: ACHPosterior,
     params: Parameters,
     events: dict[str, bool],
+    mine_signals: dict[str, float] | None = None,
     n: int = 10000,
     seed: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -145,7 +150,7 @@ def estimate_t_total(
 
     # Use sub-seeds for reproducibility
     t1 = estimate_t1(posterior, n=n, seed=rng.integers(0, 2**31))
-    t2 = estimate_t2(params, events=events, posterior=posterior, n=n, seed=rng.integers(0, 2**31))
+    t2 = estimate_t2(params, events=events, mine_signals=mine_signals, n=n, seed=rng.integers(0, 2**31))
     deployment_gap = rng.uniform(7, 14, n)
 
     t_total = t1 + deployment_gap + t2
