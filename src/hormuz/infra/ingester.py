@@ -31,8 +31,14 @@ async def fetch_readwise_articles(
     proxy: str | None = None,
     timeout: int = 30,
     limit: int = 50,
+    updated_after: str | None = None,
 ) -> list[dict]:
-    """Fetch articles from Readwise Reader API, optionally filtered by source site_name."""
+    """Fetch articles from Readwise Reader API, optionally filtered by source site_name.
+
+    updated_after: ISO datetime string (e.g. "2026-03-08T00:00:00") to fetch
+    only articles updated after this time. Essential for backfill to reach
+    older articles beyond the default feed window.
+    """
     filter_sources = sources  # None = no filtering, fetch all
     headers = {"Authorization": f"Token {token}"}
     all_docs: list[dict] = []
@@ -47,6 +53,8 @@ async def fetch_readwise_articles(
                 "location": "feed",
                 "withHtmlContent": "true",
             }
+            if updated_after:
+                params["updatedAfter"] = updated_after
             if cursor:
                 params["pageCursor"] = cursor
 

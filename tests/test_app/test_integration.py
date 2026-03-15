@@ -1,4 +1,5 @@
 """Full pipeline integration test with fixture data, no external IO."""
+import sys
 import pytest
 from pathlib import Path
 from datetime import datetime
@@ -46,7 +47,7 @@ def test_all_core_tests_pass():
     """Meta: ensure pytest collects and passes all core tests"""
     import subprocess
     result = subprocess.run(
-        ["python", "-m", "pytest", "tests/test_core/", "-v", "--tb=short"],
+        [sys.executable, "-m", "pytest", "tests/test_core/", "-v", "--tb=short"],
         capture_output=True, text=True, cwd=str(Path(__file__).parents[2])
     )
     assert result.returncode == 0

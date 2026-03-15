@@ -19,9 +19,7 @@ from hormuz.core.types import (
     StateVector,
     SystemOutput,
 )
-from hormuz.core.m1_ach import run_ach, map_to_decay_rate
-from hormuz.core.m2_duration import estimate_t_total, compute_percentiles
-from hormuz.core.m3_buffer import compute_buffer_trajectory
+from hormuz.core.m1_ach import run_ach
 from hormuz.core.m4_gap import compute_gross_gap, compute_net_gap_trajectory, integrate_total_gap
 from hormuz.core.m5_game import adjust_path_weights
 from hormuz.core.mc import MCResult, run_monte_carlo
@@ -43,31 +41,36 @@ def engine_run(
     o01_trend: str = "stable",
     schelling_signals: list | None = None,
 ) -> tuple[SystemOutput, MCResult]:
-    """Pure compute chain: M1 → M2 → M3 → M4 → M5 → MC.
+    """Pure compute chain: M1 → MC (M2+M3+M4 inside) → M5.
 
     No IO, no side effects. Returns (SystemOutput, MCResult).
+    MC is the single source of truth for T samples and buffer trajectory.
     """
-    # M1: ACH Bayesian inference
+    # M1: ACH Bayesian inference (physical/market evidence only)
     posterior = run_ach(
         observations, h3_suspended=params.h3_suspended,
         h3_prior=params.h3_prior, o01_trend=o01_trend,
     )
 
-    # M2: T distribution
-    t1_samples, t2_samples, t_total_samples = estimate_t_total(
-        posterior, params, events, n=mc_n, seed=seed,
-    )
-    t1_pct = compute_percentiles(t1_samples)
-    t2_pct = compute_percentiles(t2_samples)
-    t_total_pct = compute_percentiles(t_total_samples)
+    # Infer SPR trigger day from O13 observations
+    spr_trigger_day: int | None = None
+    o13_val = next((o.value for o in observations if o.id == "O13" and o.value > 0), None)
+    if o13_val is not None:
+        spr_trigger_day = 1  # conservative: ordered day 1, physical flow after pump delay
 
-    # M3: Buffer trajectory
-    max_day = max(180, int(t_total_pct.get("p90", 120)) + 30)
-    buffer_traj = compute_buffer_trajectory(max_day=max_day, params=params)
-
-    # M4: Gap
+    # M4: Gross gap (computed once, shared with MC)
     state = StateVector(effective_disruption=params.effective_disruption_rate)
     gross_gap = compute_gross_gap(constants, state)
+
+    # MC simulation: single source for T1/T2/T_total samples + buffer trajectory
+    mc_result = run_monte_carlo(
+        posterior, params, events, n=mc_n, seed=seed,
+        spr_trigger_day=spr_trigger_day,
+        gross_gap_mbd=gross_gap,
+    )
+
+    # Use MC's buffer trajectory for all gap calculations (consistency)
+    buffer_traj = mc_result.buffer_trajectory
     net_gap_traj = compute_net_gap_trajectory(gross_gap, buffer_traj)
 
     # Path total gaps (representative durations)
@@ -84,12 +87,9 @@ def engine_run(
             (d, ng) for d, ng in net_gap_traj if d <= t_end
         ]
 
-    # MC simulation (before M5, because MC path frequencies become base weights)
-    mc_result = run_monte_carlo(posterior, params, events, n=mc_n, seed=seed)
-
     # M5: Game theory path adjustment
-    # Base weights from MC physical simulation, then Schelling signals adjust
-    # Sources: 1) controls table (manual → medium evidence), 2) LLM-extracted signals
+    # Schelling signals live HERE (M5), not in ACH. M5 has the mature game-theory
+    # framework (credibility, focal convergence). ACH handles physical/market evidence only.
     from hormuz.core.m5_game import SignalEvidence
     game_signals: list[SignalEvidence] = []
     for ctrl in controls:
@@ -104,11 +104,12 @@ def engine_run(
     )
     path_probs = adjust_path_weights(mc_base, signals=game_signals)
 
-    # Expected total gap
+    # Expected total gap — use MC sample means (more accurate than fixed-duration proxy)
+    mc_means = mc_result.path_total_gap_means
     expected_gap = (
-        path_probs.a * path_total_gaps["A"]
-        + path_probs.b * path_total_gaps["B"]
-        + path_probs.c * path_total_gaps["C"]
+        path_probs.a * mc_means["A"]
+        + path_probs.b * mc_means["B"]
+        + path_probs.c * mc_means["C"]
     )
 
     # Consistency flags
@@ -117,9 +118,9 @@ def engine_run(
     so = SystemOutput(
         timestamp=datetime.now(),
         ach_posterior=posterior,
-        t1_percentiles=t1_pct,
-        t2_percentiles=t2_pct,
-        t_total_percentiles=t_total_pct,
+        t1_percentiles=mc_result.t1_percentiles,
+        t2_percentiles=mc_result.t2_percentiles,
+        t_total_percentiles=mc_result.t_percentiles,
         buffer_trajectory=buffer_traj,
         gross_gap_mbd=gross_gap,
         net_gap_trajectories=net_gap_trajectories,
@@ -211,7 +212,8 @@ async def run_pipeline(config: dict) -> dict:
         pass
 
     # Step 2: LLM observation + Schelling signal extraction
-    llm_signals: list[str] = []
+    from hormuz.core.m5_game import SignalEvidence as _SE
+    llm_signals: list[_SE] = []
     try:
         from hormuz.infra.llm import create_llm_backend
         llm_config = config.get("llm", {})
@@ -300,27 +302,46 @@ async def run_pipeline(config: dict) -> dict:
     # Compute O01 trend from DB history (for T1a/T1b and signal scan)
     o01_trend = compute_o01_trend(db_path)
 
-    # A6/O14 check: H3 unfreeze if unknown weapon type detected
-    o14 = next((o for o in all_obs if o.id == "O14" and o.value > 0.5), None)
+    # A6/O14 check: H3 unfreeze if external resupply evidence detected
+    # O14 >= 0.7 = strong evidence (satellite/photo or confirmed), triggers H3 unfreeze
+    o14 = next((o for o in all_obs if o.id == "O14" and o.value >= 0.7), None)
+
+    # Extract events from observations for M2 duration model
+    events: dict[str, bool] = {}
+    # E2 (minesweeper attack): O06 sharp drop indicates coastal nodes destroyed
+    o06_val = next((o.value for o in all_obs if o.id == "O06"), None)
+    if o06_val is not None and o06_val < 0.4:
+        events["E2"] = True
+    # E3 (mine strike on vessel): O10 near-zero + O01 high = active mine threat
+    o10_val = next((o.value for o in all_obs if o.id == "O10"), None)
+    o01_val = next((o.value for o in all_obs if o.id == "O01"), None)
+    if o10_val is not None and o10_val < 0.1 and o01_val is not None and o01_val > 0.6:
+        events["E3"] = True
 
     # Step 3: Engine run
     try:
         constants = load_constants(configs_dir / "constants.yaml")
         params = load_parameters(configs_dir / "parameters.yaml")
-        # H3 unfreeze: if O14 detected with high confidence, switch to 3-way ACH
-        if o14 and o14.source.endswith(":high"):
+        # H3 unfreeze: O14 >= 0.7 = strong external resupply evidence → 3-way ACH
+        if o14:
             params = params.override(h3_suspended=False)
             result["h3_unfrozen"] = True
         controls = get_controls(db_path)
         confidence = compute_confidence_level(db_path)
         so, mc_result = engine_run(
-            constants, params, all_obs, controls, events={},
+            constants, params, all_obs, controls, events=events,
             mc_n=config.get("mc", {}).get("n", 10000),
             seed=config.get("mc", {}).get("seed", 42),
             o01_trend=o01_trend,
             schelling_signals=llm_signals,
         )
-        result["schelling_signals"] = llm_signals
+        # Build full signal list for reporter (LLM + control-derived)
+        from hormuz.core.m5_game import SignalEvidence
+        all_signals = list(llm_signals) if llm_signals else []
+        for ctrl in controls:
+            if ctrl.triggered and ctrl.effect:
+                all_signals.append(SignalEvidence(key=ctrl.effect, evidence=0.5))
+        result["schelling_signals"] = all_signals
         so.confidence_level = confidence
         if confidence == "burn_in":
             so.consistency_flags.append("BURN-IN: <3 days history, output unreliable")
@@ -360,7 +381,7 @@ async def run_pipeline(config: dict) -> dict:
             conflict_start=config.get("conflict_start", "2026-03-01"),
             brent_price=brent_price,
             position_result=result.get("positions"),
-            game_signals=llm_signals,
+            game_signals=result.get("schelling_signals", []),
             mc_n=config.get("mc", {}).get("n", 10000),
         )
         # Also sync to docs/ for GitHub Pages

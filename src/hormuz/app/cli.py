@@ -197,6 +197,7 @@ async def _backfill(config_path, days, batch_size):
         proxy=rw.get("proxy"),
         timeout=rw.get("timeout", 30),
         limit=200,
+        updated_after=cutoff.strftime("%Y-%m-%dT00:00:00"),
     )
 
     # Filter to articles within date range and group by date
@@ -226,6 +227,10 @@ async def _backfill(config_path, days, batch_size):
         try:
             ts = datetime.fromisoformat(date_str + "T12:00:00")
         except ValueError:
+            continue
+
+        if len(day_articles) < 3:
+            click.echo(f"  {date_str}: {len(day_articles)} articles — skipped (min 3)")
             continue
 
         click.echo(f"  {date_str}: {len(day_articles)} articles...", nl=False)

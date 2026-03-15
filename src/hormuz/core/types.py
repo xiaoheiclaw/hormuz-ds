@@ -122,15 +122,26 @@ class PathWeights(BaseModel):
         if total == 0:
             return PathWeights(a=1 / 3, b=1 / 3, c=1 / 3)
         vals = [self.a / total, self.b / total, self.c / total]
-        # Clip then redistribute excess to unclamped values
+        # Clip then redistribute residual to unclamped values
         for _ in range(20):
             clamped = [max(0.05, min(0.85, v)) for v in vals]
             residual = 1.0 - sum(clamped)
             if abs(residual) < 1e-12:
                 break
-            # Distribute residual proportionally to unclamped values
             free = [i for i in range(3) if 0.05 < clamped[i] < 0.85]
             if not free:
+                # All at boundaries — distribute residual to boundary values
+                # proportionally, relaxing clip to maintain sum=1.0
+                if residual > 0:
+                    # Need to increase: give to floor values (they have room to grow)
+                    floor_ids = [i for i in range(3) if clamped[i] <= 0.05]
+                    targets = floor_ids if floor_ids else list(range(3))
+                else:
+                    # Need to decrease: take from ceiling values
+                    ceil_ids = [i for i in range(3) if clamped[i] >= 0.85]
+                    targets = ceil_ids if ceil_ids else list(range(3))
+                share = residual / len(targets)
+                clamped = [clamped[i] + (share if i in targets else 0) for i in range(3)]
                 break
             share = residual / len(free)
             vals = [clamped[i] + (share if i in free else 0) for i in range(3)]

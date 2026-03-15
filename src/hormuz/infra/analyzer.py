@@ -81,7 +81,9 @@ O07 — war_risk_insurance_premium: hull war risk additional premium as % of ves
   - Red Sea Houthi crisis (2024): 0.4-0.5%
   - Full war / strait closed: 5-10%+ (or commercial insurance unavailable)
   If articles mention government war risk backstop/guarantee program, AP is likely >5%.
-  If no specific number in articles, estimate from crisis severity — do NOT default to 0.
+  IMPORTANT: If articles quote a specific premium number, use that number and set confidence=high.
+  If no specific number, estimate conservatively from crisis severity and set confidence=low.
+  Do NOT invent precise numbers (e.g., 8.5%) without a source — round to nearest anchor (1%, 2%, 5%, 10%).
   News phrases: "war risk premium surged to X%", "insurance costs soared", "AP quoted at X%",
   "hull war risk", "underwriters raised rates", "government war risk backstop",
   "DFC war risk facility", "insurers refuse to quote"
@@ -126,13 +128,21 @@ O13 — spr_release_rate: actual SPR PHYSICAL release rate in million barrels/da
   News phrases that ARE O13: "SPR drawdown of X mbd", "barrels flowing from SPR at X/day"
   News phrases that are NOT O13: "released 400M barrels" (total), "authorized SPR release" (announcement)
 
-## A6: H3 UNFREEZE MONITOR
+## A6: H3 UNFREEZE MONITOR — external resupply indicators
 
-O14 — unknown_weapon_type: has an unknown/new weapon type been observed that is NOT in IRGC's known inventory?
-  0=no unknown weapons (normal), 1.0=confirmed new weapon type (e.g., Russian-origin missile not previously seen)
-  News phrases: "previously unseen weapon", "new missile type identified", "weapon not in known Iranian arsenal",
-  "foreign-supplied munitions confirmed", "debris analysis reveals unknown origin"
-  NOTE: This is rare. Most days should be 0. Only report 1.0 if articles explicitly describe a NEW weapon type.
+O14 — external_resupply_indicator: evidence of foreign (non-Iranian) military supply to IRGC forces.
+  0=no evidence (normal), 0.3-0.5=indirect signs, 0.7-1.0=strong/confirmed evidence
+  TWO categories of evidence:
+  (a) Unknown weapon type: weapon NOT in IRGC's known inventory observed in field
+      Phrases: "previously unseen weapon", "new missile type", "weapon not in known Iranian arsenal",
+      "debris analysis reveals unknown origin", "foreign-supplied munitions confirmed"
+  (b) Resupply logistics: Russian/Chinese/North Korean military transport to Iran
+      Phrases: "Russian transport aircraft landed in Iran", "Il-76 cargo flights to Bandar Abbas",
+      "military cargo shipment to Iran", "Russian arms shipment", "weapons transfer to IRGC",
+      "North Korean munitions delivery", "Chinese military aid to Iran"
+  Scoring: 0.3=rumor/unconfirmed report, 0.5=credible media report, 0.7=satellite/photo evidence,
+           1.0=official confirmation or debris analysis proving foreign origin
+  NOTE: This is rare. Most days should be 0. Do NOT inflate — only report if articles contain clear evidence.
 
 ## SCHELLING SIGNALS (game theory — include in "signals" array if detected)
 

@@ -41,12 +41,19 @@ def mc_result():
     rng = np.random.default_rng(42)
     t = rng.uniform(10, 150, size=100)
     gap = rng.uniform(100, 2000, size=100)
+    t1 = rng.uniform(5, 60, size=100)
+    t2 = rng.uniform(10, 90, size=100)
     return MCResult(
+        t1_samples=t1,
+        t2_samples=t2,
         t_samples=t,
         total_gap_samples=gap,
+        t1_percentiles={"p10": 8, "p50": 30, "p90": 55},
+        t2_percentiles={"p10": 15, "p50": 45, "p90": 80},
         t_percentiles={"p10": 20, "p50": 60, "p90": 130},
         path_frequencies={"A": 0.30, "B": 0.50, "C": 0.20},
         path_total_gap_means={"A": 300, "B": 900, "C": 2000},
+        buffer_trajectory=[(d, 1.0) for d in range(180)],
     )
 
 

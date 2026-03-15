@@ -7,8 +7,7 @@ TotalGap = ∫₀ᵀ NetGap(t) dt  (trapezoidal, mbd·days)
 
 from __future__ import annotations
 
-from hormuz.core.types import Constants, Parameters, StateVector
-from hormuz.core.m3_buffer import compute_buffer_trajectory
+from hormuz.core.types import Constants, StateVector
 
 
 def compute_gross_gap(constants: Constants, state: StateVector) -> float:
@@ -46,22 +45,3 @@ def integrate_total_gap(
         ng1 = compute_net_gap(gross_gap, buf1)
         total += (ng0 + ng1) / 2.0 * (d1 - d0)
     return total
-
-
-def compute_path_total_gaps(
-    gross_gap: float,
-    params: Parameters,
-) -> dict[str, float]:
-    """Compute TotalGap for standard paths A/B/C.
-
-    Path boundaries: A < 35 days, B = 35-120, C > 120.
-    Uses representative durations: A=28, B=84, C=180.
-    """
-    # Generate buffer trajectory up to max path duration
-    traj = compute_buffer_trajectory(max_day=180, params=params)
-
-    return {
-        "A": integrate_total_gap(gross_gap, traj, t_end=28),
-        "B": integrate_total_gap(gross_gap, traj, t_end=84),
-        "C": integrate_total_gap(gross_gap, traj, t_end=180),
-    }

@@ -42,13 +42,3 @@ def test_net_gap_trajectory():
     assert traj[0][1] == pytest.approx(16.0)
     assert traj[1][1] == pytest.approx(14.5)
     assert traj[2][1] == pytest.approx(9.0)
-
-
-def test_path_total_gaps():
-    """Compute TotalGap for all three paths"""
-    from hormuz.core.m4_gap import compute_path_total_gaps
-    from hormuz.core.types import Parameters
-    params = Parameters()
-    gaps = compute_path_total_gaps(gross_gap=16.0, params=params)
-    assert "A" in gaps and "B" in gaps and "C" in gaps
-    assert gaps["A"] < gaps["B"] < gaps["C"]

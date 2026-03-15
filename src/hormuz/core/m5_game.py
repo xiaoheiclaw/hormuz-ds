@@ -10,7 +10,7 @@ Focal convergence: N same-direction signals → non-linear amplification.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from hormuz.core.types import ACHPosterior, PathWeights
+from hormuz.core.types import PathWeights
 
 # ── Base sensitivity — global knob for all signal effects ────────────
 BASE_SENSITIVITY = 0.15
@@ -55,20 +55,6 @@ _SIGNAL_DEFS: dict[str, SignalDef] = {
 _COMBO_REQUIRES: dict[str, list[str]] = {
     "irgc_fragmentation": ["us_inconsistency"],
 }
-
-
-def ach_to_base_weights(posterior: ACHPosterior) -> PathWeights:
-    """Map ACH posterior to base path weights.
-
-    H1 (depletion) → short crisis → more A, less C
-    H2 (preserved) → long crisis → more C, less A
-    B absorbs the middle ground.
-    """
-    h1 = posterior.h1
-    a = 0.25 + 0.30 * (h1 - 0.5)
-    c = 0.25 - 0.30 * (h1 - 0.5)
-    b = 1.0 - a - c
-    return PathWeights(a=a, b=b, c=c).normalized()
 
 
 def adjust_path_weights(
@@ -120,20 +106,21 @@ def adjust_path_weights(
         focal = 1.0 + FOCAL_BONUS * (n - 1) if n > 1 else 1.0
         dir_shift[d] = raw_sum * focal
 
-    # Apply shifts to weights
-    weights = {"A": base.a, "B": base.b, "C": base.c}
+    # Compute boost and damp factors from original weights (order-independent)
+    boost = {}
+    damp = {}
     for d in ("A", "B", "C"):
         shift = dir_shift.get(d, 0.0)
-        if shift > 0:
-            # Boost target direction
-            weights[d] *= (1.0 + shift)
-            # Dampen other directions proportionally
-            others = [x for x in ("A", "B", "C") if x != d]
-            for o in others:
-                weights[o] *= (1.0 - shift * 0.3)
+        boost[d] = 1.0 + shift if shift > 0 else 1.0
+        damp[d] = max(0.1, 1.0 - shift * 0.3) if shift > 0 else 1.0
 
-    # Ensure no negative
-    for d in weights:
-        weights[d] = max(weights[d], 0.001)
+    # Apply simultaneously: each path gets its own boost × product of damp from other directions
+    weights = {}
+    for d in ("A", "B", "C"):
+        others = [x for x in ("A", "B", "C") if x != d]
+        factor = boost[d]
+        for o in others:
+            factor *= damp[o]
+        weights[d] = max(0.001, getattr(base, d.lower()) * factor)
 
     return PathWeights(a=weights["A"], b=weights["B"], c=weights["C"]).normalized()

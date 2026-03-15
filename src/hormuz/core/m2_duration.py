@@ -20,6 +20,11 @@ _T1_H1_SIGMA = 0.6
 _T1_H2_MU = np.log(42)
 _T1_H2_SIGMA = 0.55
 
+# H3 (external resupply): median ~90 days, capability sustained by foreign supply
+# Attack phase ends only via political resolution or military defeat, not depletion
+_T1_H3_MU = np.log(90)
+_T1_H3_SIGMA = 0.5
+
 # ── Event jump days ───────────────────────────────────────────────────
 _EVENT_JUMPS = {
     "E2": 14,   # Minesweeper attack
@@ -29,17 +34,33 @@ _EVENT_JUMPS = {
 
 
 def estimate_t1(posterior: ACHPosterior, n: int = 10000, seed: int | None = None) -> np.ndarray:
-    """Sample T1 from mixture of two lognormals weighted by ACH posterior."""
+    """Sample T1 from mixture of lognormals weighted by ACH posterior.
+
+    2-way (H3 suspended): H1/H2 mixture.
+    3-way (H3 active): H1/H2/H3 mixture — H3 component has longer median (~90d).
+    """
     rng = np.random.default_rng(seed)
-
-    # Mixture: draw from H1 or H2 component per sample
-    w_h1 = posterior.h1 / (posterior.h1 + posterior.h2)
-    mask_h1 = rng.random(n) < w_h1
-
     samples = np.empty(n)
-    n_h1 = mask_h1.sum()
-    samples[mask_h1] = rng.lognormal(_T1_H1_MU, _T1_H1_SIGMA, n_h1)
-    samples[~mask_h1] = rng.lognormal(_T1_H2_MU, _T1_H2_SIGMA, n - n_h1)
+
+    h3_weight = posterior.h3 if posterior.h3 is not None else 0.0
+    total = posterior.h1 + posterior.h2 + h3_weight
+    if total == 0:
+        total = 1.0
+
+    w_h1 = posterior.h1 / total
+    w_h2 = posterior.h2 / total
+    # w_h3 = h3_weight / total (remainder)
+
+    # Draw component assignment per sample
+    u = rng.random(n)
+    mask_h1 = u < w_h1
+    mask_h2 = (u >= w_h1) & (u < w_h1 + w_h2)
+    mask_h3 = ~mask_h1 & ~mask_h2
+
+    samples[mask_h1] = rng.lognormal(_T1_H1_MU, _T1_H1_SIGMA, mask_h1.sum())
+    samples[mask_h2] = rng.lognormal(_T1_H2_MU, _T1_H2_SIGMA, mask_h2.sum())
+    if mask_h3.any():
+        samples[mask_h3] = rng.lognormal(_T1_H3_MU, _T1_H3_SIGMA, mask_h3.sum())
 
     return samples
 
@@ -108,15 +129,28 @@ def estimate_t_total(
     jump_mask = rng.random(n) < 0.08
     n_jumps = jump_mask.sum()
     if n_jumps > 0:
-        # H1-dominant → more ceasefire jumps; H2-dominant → more escalation jumps
-        p_short = posterior.h1 / (posterior.h1 + posterior.h2)
+        # H1 → ceasefire; H2+H3 → escalation (H3 = sustained resupply = escalation-favoring)
+        h3_w = posterior.h3 if posterior.h3 is not None else 0.0
+        p_short = posterior.h1 / (posterior.h1 + posterior.h2 + h3_w)
         short_mask = rng.random(n_jumps) < p_short
-        # Short scenario: 14-30 days (rapid political resolution)
-        t_total[jump_mask] = np.where(
-            short_mask,
-            rng.uniform(14, 30, n_jumps),       # ceasefire
-            rng.uniform(150, 365, n_jumps),      # full escalation
-        )
+        ceasefire_t = rng.uniform(14, 30, n_jumps)
+        escalation_t = rng.uniform(150, 365, n_jumps)
+        new_t_total = np.where(short_mask, ceasefire_t, escalation_t)
+        t_total[jump_mask] = new_t_total
+
+        # Sync T1/T2 with jumped T_total to maintain consistency
+        # Ceasefire: political end before clearance → T1 = new total, T2 = 0
+        # Escalation: attack phase extends → scale T1, keep T2
+        jump_indices = np.where(jump_mask)[0]
+        for j, idx in enumerate(jump_indices):
+            if short_mask[j]:
+                # Ceasefire: conflict ends before sweep phase
+                t1[idx] = new_t_total[j] - deployment_gap[idx]
+                t2[idx] = 0.0
+            else:
+                # Escalation: longer attack, sweep unchanged
+                t1[idx] = new_t_total[j] - deployment_gap[idx] - t2[idx]
+            t1[idx] = max(1.0, t1[idx])
 
     return t1, t2, t_total
 

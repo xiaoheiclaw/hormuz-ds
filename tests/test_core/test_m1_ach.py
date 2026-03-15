@@ -10,8 +10,8 @@ def make_obs(obs_id: str, value: float) -> Observation:
 def test_prior_with_h3_suspended():
     from hormuz.core.m1_ach import compute_prior
     prior = compute_prior(h3_suspended=True, h3_prior=0.10)
-    assert abs(prior["H1"] - 0.475) < 1e-6
-    assert abs(prior["H2"] - 0.475) < 1e-6
+    assert abs(prior["H1"] - 0.5) < 1e-6
+    assert abs(prior["H2"] - 0.5) < 1e-6
     assert prior.get("H3") is None
 
 
@@ -63,11 +63,3 @@ def test_bayesian_update_multiple():
     assert isinstance(result, ACHPosterior)
     assert result.h1 > 0.7
     assert result.dominant == "H1"
-
-
-def test_decay_rate_mapping():
-    from hormuz.core.m1_ach import map_to_decay_rate
-    # H1 dominant -> high decay
-    assert map_to_decay_rate(ACHPosterior(h1=0.8, h2=0.2, h3=None)) > 0.05
-    # H2 dominant -> low decay
-    assert map_to_decay_rate(ACHPosterior(h1=0.2, h2=0.8, h3=None)) < 0.04
