@@ -237,28 +237,36 @@ async def fetch_bunker_spread(
     Returns O12 observation with spread in $/mt.
     Normal spread <$20, crisis >$100 signals logistics breakdown.
     """
+    import asyncio as _aio
+
     prices = {}
-    async with httpx.AsyncClient(proxy=proxy, timeout=timeout) as client:
-        for port, url in _BUNKER_URLS.items():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+    for port, url in _BUNKER_URLS.items():
+        for attempt in range(3):
             try:
-                resp = await client.get(url, headers={
-                    "User-Agent": "Mozilla/5.0 (compatible; HormuzDS/1.0)",
-                })
-                resp.raise_for_status()
-                # Extract VLSFO price from page — pattern: "VLSFO" followed by price
-                # Ship & Bunker format: price in table cells like "1,052.50"
+                async with httpx.AsyncClient(
+                    proxy=proxy, timeout=timeout, follow_redirects=True,
+                ) as client:
+                    resp = await client.get(url, headers=headers)
+                    resp.raise_for_status()
                 text = resp.text
-                # Look for VLSFO price pattern in the HTML
-                # The price appears after VLSFO mention in table structure
-                m = re.search(
-                    r'VLSFO.*?(?:Price|price|>\s*\$?\s*)([\d,]+\.?\d*)\s*(?:\$|/mt|<)',
-                    text, re.DOTALL | re.IGNORECASE,
-                )
-                if m:
-                    price_str = m.group(1).replace(",", "")
-                    prices[port] = float(price_str)
+                start = text.find("Latest Prices, VLSFO")
+                if start < 0:
+                    break
+                chunk = text[start:start + 6000]
+                tds = re.findall(r"<td[^>]*>(.*?)</td>", chunk, re.DOTALL)
+                if tds:
+                    inner = re.sub(r"<[^>]+>", "", tds[0]).strip()
+                    prices[port] = float(inner.replace(",", ""))
+                break
+            except (httpx.RemoteProtocolError, httpx.ConnectError):
+                if attempt < 2:
+                    await _aio.sleep(2 ** attempt)
             except Exception:
-                continue
+                break
 
     if "fujairah" not in prices or "singapore" not in prices:
         return None
