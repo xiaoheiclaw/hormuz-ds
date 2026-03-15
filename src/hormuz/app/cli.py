@@ -86,7 +86,8 @@ def status(db_path):
     click.echo(f"Timestamp: {so.timestamp}")
     click.echo(f"GrossGap: {so.gross_gap_mbd:.1f} mbd")
     click.echo(f"ACH: H1={so.ach_posterior.h1:.2f} H2={so.ach_posterior.h2:.2f} → {so.ach_posterior.dominant}")
-    click.echo(f"T total p50: {so.t_total_percentiles.get('p50', '?')} days")
+    p50 = so.t_total_percentiles.get('p50', 0)
+    click.echo(f"T expected: {so.t_weighted_mean:.0f} days (p50={p50:.0f})")
     click.echo(f"Paths: A={so.path_probabilities.a:.0%} B={so.path_probabilities.b:.0%} C={so.path_probabilities.c:.0%}")
     click.echo(f"Expected TotalGap: {so.expected_total_gap:.0f} mbd·days")
     if so.consistency_flags:

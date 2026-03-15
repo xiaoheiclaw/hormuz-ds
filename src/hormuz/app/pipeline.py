@@ -128,6 +128,7 @@ def engine_run(
         t1_percentiles=mc_result.t1_percentiles,
         t2_percentiles=mc_result.t2_percentiles,
         t_total_percentiles=mc_result.t_percentiles,
+        t_weighted_mean=mc_result.t_weighted_mean,
         buffer_trajectory=buffer_traj,
         gross_gap_mbd=gross_gap,
         net_gap_trajectories=net_gap_trajectories,

@@ -27,7 +27,9 @@ class MCResult:
     t2_percentiles: dict[str, float]
     t_percentiles: dict[str, float]
     path_frequencies: dict[str, float]    # {"A": frac, "B": frac, "C": frac}
+    path_t_means: dict[str, float]         # per-path average T duration
     path_total_gap_means: dict[str, float]  # per-path average TotalGap
+    t_weighted_mean: float                  # path-weighted expected T
     buffer_trajectory: list[tuple[int, float]]  # shared buffer trajectory
 
 
@@ -92,8 +94,9 @@ def run_monte_carlo(
     total_n = sum(counts.values())
     path_freq = {k: v / total_n for k, v in counts.items()}
 
-    # Per-path mean TotalGap
-    path_means: dict[str, float] = {}
+    # Per-path mean T and TotalGap
+    path_t_means: dict[str, float] = {}
+    path_gap_means: dict[str, float] = {}
     b1, b2 = _PATH_BOUNDARIES
     masks = {
         "A": t_total < b1,
@@ -102,9 +105,16 @@ def run_monte_carlo(
     }
     for path, mask in masks.items():
         if mask.any():
-            path_means[path] = float(np.mean(total_gap_samples[mask]))
+            path_t_means[path] = float(np.mean(t_total[mask]))
+            path_gap_means[path] = float(np.mean(total_gap_samples[mask]))
         else:
-            path_means[path] = 0.0
+            path_t_means[path] = 0.0
+            path_gap_means[path] = 0.0
+
+    # Path-weighted expected T (for decision-making, captures tail risk)
+    t_weighted_mean = sum(
+        path_freq[p] * path_t_means[p] for p in ("A", "B", "C")
+    )
 
     return MCResult(
         t1_samples=t1,
@@ -115,6 +125,8 @@ def run_monte_carlo(
         t2_percentiles=compute_percentiles(t2),
         t_percentiles=compute_percentiles(t_total),
         path_frequencies=path_freq,
-        path_total_gap_means=path_means,
+        path_t_means=path_t_means,
+        path_total_gap_means=path_gap_means,
+        t_weighted_mean=float(t_weighted_mean),
         buffer_trajectory=buffer_traj,
     )

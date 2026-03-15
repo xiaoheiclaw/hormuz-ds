@@ -159,6 +159,7 @@ class SystemOutput(BaseModel):
     t1_percentiles: dict[str, float]
     t2_percentiles: dict[str, float]
     t_total_percentiles: dict[str, float]
+    t_weighted_mean: float = 0.0                # path-weighted expected T
     buffer_trajectory: list[tuple[int, float]]
     gross_gap_mbd: float
     net_gap_trajectories: dict[str, list[tuple[int, float]]]

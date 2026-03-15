@@ -52,7 +52,9 @@ def mc_result():
         t2_percentiles={"p10": 15, "p50": 45, "p90": 80},
         t_percentiles={"p10": 20, "p50": 60, "p90": 130},
         path_frequencies={"A": 0.30, "B": 0.50, "C": 0.20},
+        path_t_means={"A": 25, "B": 70, "C": 180},
         path_total_gap_means={"A": 300, "B": 900, "C": 2000},
+        t_weighted_mean=0.30 * 25 + 0.50 * 70 + 0.20 * 180,
         buffer_trajectory=[(d, 1.0) for d in range(180)],
     )
 
