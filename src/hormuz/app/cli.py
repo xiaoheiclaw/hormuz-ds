@@ -255,8 +255,79 @@ async def _backfill(config_path, days, batch_size):
 
 
 @cli.command()
-def validate():
+@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), default=None)
+def validate(config_path):
     """Run consistency checks on current state."""
-    click.echo("Validation: load latest output and check consistency flags")
-    # TODO: implement full validation
-    click.echo("OK")
+    config = _load_config(config_path)
+    db_path = Path(config.get("db", {}).get("path", "data/hormuz.db"))
+    issues: list[str] = []
+    warnings: list[str] = []
+
+    # 1. DB exists
+    if not db_path.exists():
+        click.echo(click.style("FAIL", fg="red") + f": database not found at {db_path}")
+        raise SystemExit(1)
+
+    from hormuz.infra.db import (
+        get_observations, get_history_days, compute_confidence_level,
+        get_latest_output,
+    )
+
+    # 2. Observation coverage
+    all_ids = {f"O{i:02d}" for i in range(1, 15)}
+    obs = get_observations(db_path)
+    present_ids = {o.id for o in obs}
+    missing = sorted(all_ids - present_ids)
+    if missing:
+        warnings.append(f"missing observations: {', '.join(missing)}")
+
+    # 3. Freshness
+    if obs:
+        latest_ts = max(o.timestamp for o in obs)
+        age_hours = (datetime.now() - latest_ts).total_seconds() / 3600
+        if age_hours > 8:
+            issues.append(f"stale data: latest observation is {age_hours:.0f}h old")
+        elif age_hours > 4:
+            warnings.append(f"data aging: latest observation is {age_hours:.1f}h old")
+
+    # 4. History depth & confidence
+    days = get_history_days(db_path)
+    confidence = compute_confidence_level(db_path)
+    if confidence == "burn_in":
+        warnings.append(f"BURN-IN: only {days} days of history (<3 needed for reliable output)")
+    elif confidence == "low":
+        warnings.append(f"low confidence: {days} days of history (need >7 for normal)")
+
+    # 5. Latest system output
+    so = get_latest_output(db_path)
+    if so is None:
+        issues.append("no system output found — run `hormuz run` first")
+    else:
+        # Consistency flags from engine
+        for flag in so.consistency_flags:
+            issues.append(f"engine flag: {flag}")
+        # Path weights sum
+        pw = so.path_probabilities
+        total = pw.a + pw.b + pw.c
+        if abs(total - 1.0) > 0.02:
+            issues.append(f"path weights don't sum to 1: A={pw.a} B={pw.b} C={pw.c} (sum={total:.3f})")
+        # T percentile ordering
+        p = so.t_total_percentiles
+        if p.get("p10", 0) > p.get("p50", 0) or p.get("p50", 0) > p.get("p90", 0):
+            issues.append(f"T percentile inversion: p10={p.get('p10')} p50={p.get('p50')} p90={p.get('p90')}")
+
+    # 6. Report
+    click.echo(f"DB: {db_path} ({days} days, confidence={confidence})")
+    click.echo(f"Observations: {len(obs)} total, {len(present_ids)}/{len(all_ids)} O-series covered")
+    if so:
+        click.echo(f"Latest output: {so.timestamp.strftime('%Y-%m-%d %H:%M')}")
+
+    if not issues and not warnings:
+        click.echo(click.style("OK", fg="green") + " — all checks passed")
+    else:
+        for w in warnings:
+            click.echo(click.style("WARN", fg="yellow") + f": {w}")
+        for i in issues:
+            click.echo(click.style("ISSUE", fg="red") + f": {i}")
+        if issues:
+            raise SystemExit(1)
