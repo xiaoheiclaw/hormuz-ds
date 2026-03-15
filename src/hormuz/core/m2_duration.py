@@ -112,9 +112,10 @@ def estimate_t2(
 
     mines = rng.uniform(lo, hi, n)
 
-    # Sweep rate: modern MCM with sonar/UUV/ROV, ~2.5 mines/day/ship
-    # Range 1.5-4.0 accounts for depth, currents, mine type uncertainty
-    rate_per_ship = rng.uniform(1.5, 4.0, n)
+    # Sweep rate: LCS MCM pkg + unmanned systems (post-Avenger decom)
+    # Lower than dedicated MCM: UUV/USV unproven in combat, LCS not purpose-built
+    # Range 1.0-2.5 mines/day/ship (Avenger was ~1.5-4.0)
+    rate_per_ship = rng.uniform(1.0, 2.5, n)
     sweep_days = mines / (params.sweep_ships * rate_per_ship)
 
     # Mine type penalty: mixed types take ~20% longer

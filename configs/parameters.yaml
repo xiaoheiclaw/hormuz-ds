@@ -19,7 +19,9 @@ physical:
     convoy_start_mean_weeks: 5.0
     # v5.4: uniform distribution, not point estimate
     sea_mines_range: [20, 100]
-    sweep_ships_available: 6
+    # 2025-09: 4x Avenger decommissioned, replaced by LCS + unmanned
+    # ~2-4 US LCS (MCM pkg) + 2 UK Hunt-class ≈ 4 MCM-capable
+    sweep_ships_available: 4
 
   q3:
     pipeline_max_mbd: 4.0

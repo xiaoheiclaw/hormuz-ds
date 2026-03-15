@@ -25,7 +25,7 @@ class Parameters(BaseModel):
     """P01-P10: tunable parameters from PRD §2.2."""
     gross_gap_mbd: float = 16.0                     # P01: 20.1 × 0.80
     mines_in_water_range: tuple[int, int] = (20, 100)  # P02: Uniform draw
-    sweep_ships: int = 6                             # P03
+    sweep_ships: int = 4                             # P03: post-Avenger decom
     pipeline_max_mbd: float = 4.0                    # P04
     pipeline_ramp_weeks: float = 2.5                 # P05
     spr_rate_mean_mbd: float = 2.5                   # P06
