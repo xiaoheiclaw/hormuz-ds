@@ -216,53 +216,72 @@ def run_ach(
     h3_prior: float = 0.10,
     max_log_odds: float = _MAX_LOG_ODDS,
     o01_trend: str = "stable",
-) -> ACHPosterior:
+    prior_log_odds: float | None = None,
+    prior_h3_suspended: bool | None = None,
+    prior_h3_posterior: float | None = None,
+) -> tuple[ACHPosterior, float]:
     """Run ACH in log-odds space with correlation grouping.
 
-    1. Compute prior (50:50 when H3 suspended)
-    2. Compute observation LRs with correlation grouping (prevent double-counting)
-    3. Accumulate in log-odds space, clamp to 95% cap
-    4. Convert back to probabilities
+    1. Start from persisted prior (prior_log_odds) or fresh 50:50
+    2. Handle H3 freeze/unfreeze state transitions (migrate, don't reset)
+    3. Compute observation LRs with correlation grouping
+    4. Accumulate in log-odds space, clamp to 95% cap
+    5. Convert back to probabilities
 
-    Schelling/game-theory signals are handled by M5 (adjust_path_weights),
-    which has the mature credibility × focal convergence framework.
+    Returns (posterior, final_log_odds) — log_odds for persistence across runs.
     """
-    prior = compute_prior(h3_suspended, h3_prior)
     ach_context = {"O01_trend": o01_trend}
 
-    active = {k: v for k, v in prior.items() if v is not None}
-    keys = sorted(active.keys())
+    # Determine starting log-odds
+    if prior_log_odds is not None:
+        log_odds = prior_log_odds
+    else:
+        log_odds = 0.0  # fresh start: H1=H2=50%
 
-    if len(keys) == 2:
-        k0, k1 = keys  # H1, H2
-        log_odds = math.log(active[k0] / active[k1]) if active[k1] > 0 else 0.0
+    # Handle H3 state transitions
+    if prior_h3_suspended is not None and prior_h3_suspended != h3_suspended:
+        # State transition — migrate, don't reset
+        if prior_h3_suspended and not h3_suspended:
+            # 2-way → 3-way: H3 unfreezing. Keep H1/H2 log-odds, inject H3.
+            # log_odds carries forward unchanged (H1/H2 ratio preserved)
+            pass
+        elif not prior_h3_suspended and h3_suspended:
+            # 3-way → 2-way: H3 re-freezing. Project H1/H2 back.
+            # log_odds already represents H1/H2 ratio, keep it.
+            # (In 3-way mode we track log_odds as log(H1/H2) alongside H3)
+            pass
 
-        # 1. Observation evidence with correlation grouping
-        deltas, _ = _apply_correlation_grouping(observations, ach_context)
+    # Observation evidence with correlation grouping
+    deltas, lr_dicts = _apply_correlation_grouping(observations, ach_context)
+
+    if h3_suspended:
+        # 2-way path: accumulate deltas in log-odds space
         for d in deltas:
             log_odds += d
-
-        # 2. Clamp
         log_odds = max(-max_log_odds, min(max_log_odds, log_odds))
 
-        # 3. Convert back
         odds = math.exp(log_odds)
-        p0 = odds / (1.0 + odds)
-        p1 = 1.0 / (1.0 + odds)
+        p_h1 = odds / (1.0 + odds)
+        p_h2 = 1.0 / (1.0 + odds)
 
-        return ACHPosterior(
-            h1=p0 if k0 == "H1" else p1,
-            h2=p1 if k0 == "H1" else p0,
-            h3=None if h3_suspended else prior.get("H3"),
-        )
+        return ACHPosterior(h1=p_h1, h2=p_h2, h3=None), log_odds
     else:
-        # 3-way (H3 active): correlation grouping + cap
-        posterior_dict = dict(active)
+        # 3-way (H3 active): start from prior state
+        # Convert log_odds back to H1/H2 probabilities, inject H3
+        odds = math.exp(log_odds)
+        p_h1_raw = odds / (1.0 + odds)
+        p_h2_raw = 1.0 / (1.0 + odds)
+        # Scale H1/H2 to make room for H3
+        h3_p = prior_h3_posterior if prior_h3_posterior is not None else h3_prior
+        scale = 1.0 - h3_p
+        posterior_dict = {
+            "H1": p_h1_raw * scale,
+            "H2": p_h2_raw * scale,
+            "H3": h3_p,
+        }
 
-        # Apply grouped observation evidence (use raw LR dicts with H3 keys)
-        _, lr_dicts = _apply_correlation_grouping(observations, ach_context)
+        # Apply grouped observation evidence
         for lr in lr_dicts:
-            # Ensure all hypothesis keys present (default neutral for missing)
             full_lr = {k: lr.get(k, 1.0) for k in posterior_dict}
             posterior_dict = bayesian_update(posterior_dict, full_lr)
 
@@ -272,11 +291,18 @@ def run_ach(
         total = sum(posterior_dict.values())
         posterior_dict = {k: v / total for k, v in posterior_dict.items()}
 
+        # Update log_odds to reflect current H1/H2 ratio (for future persistence)
+        h1_final = posterior_dict["H1"]
+        h2_final = posterior_dict["H2"]
+        if h2_final > 0:
+            log_odds = math.log(h1_final / h2_final)
+        log_odds = max(-max_log_odds, min(max_log_odds, log_odds))
+
         return ACHPosterior(
-            h1=posterior_dict.get("H1", 0.0),
-            h2=posterior_dict.get("H2", 0.0),
+            h1=h1_final,
+            h2=h2_final,
             h3=posterior_dict.get("H3"),
-        )
+        ), log_odds
 
 
 def bayesian_update(prior: dict[str, float], lr: dict[str, float]) -> dict[str, float]:

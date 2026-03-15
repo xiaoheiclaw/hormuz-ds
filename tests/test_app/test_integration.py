@@ -19,7 +19,7 @@ def test_engine_run_produces_valid_output(setup):
     from hormuz.core.types import SystemOutput
     constants = load_constants(setup["configs_dir"] / "constants.yaml")
     params = load_parameters(setup["configs_dir"] / "parameters.yaml")
-    so, mc_r = engine_run(constants, params, observations=[], controls=[], events={}, mc_n=100, seed=42)
+    so, mc_r, _ = engine_run(constants, params, observations=[], controls=[], events={}, mc_n=100, seed=42)
     assert isinstance(so, SystemOutput)
     assert so.gross_gap_mbd > 15
     assert so.path_probabilities.a + so.path_probabilities.b + so.path_probabilities.c == pytest.approx(1.0)
@@ -34,7 +34,7 @@ def test_full_roundtrip(setup):
 
     constants = load_constants(setup["configs_dir"] / "constants.yaml")
     params = load_parameters(setup["configs_dir"] / "parameters.yaml")
-    so, mc_result = engine_run(constants, params, [], [], {}, mc_n=100, seed=42)
+    so, mc_result, _ = engine_run(constants, params, [], [], {}, mc_n=100, seed=42)
 
     # Save + load
     save_system_output(setup["db_path"], so)

@@ -59,7 +59,7 @@ def test_bayesian_update_multiple():
         make_obs("O03", 0.1),  # uncoordinated/fragmented (H1)
         make_obs("O04", 0.1),  # only crude weapons (H1)
     ]
-    result = run_ach(obs, h3_suspended=True, h3_prior=0.10)
+    result, _ = run_ach(obs, h3_suspended=True, h3_prior=0.10)
     assert isinstance(result, ACHPosterior)
     assert result.h1 > 0.7
     assert result.dominant == "H1"

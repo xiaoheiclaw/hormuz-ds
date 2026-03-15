@@ -40,16 +40,23 @@ def engine_run(
     seed: int | None = None,
     o01_trend: str = "stable",
     schelling_signals: list | None = None,
-) -> tuple[SystemOutput, MCResult]:
+    prior_log_odds: float | None = None,
+    prior_h3_suspended: bool | None = None,
+    prior_h3_posterior: float | None = None,
+) -> tuple[SystemOutput, MCResult, float]:
     """Pure compute chain: M1 → MC (M2+M3+M4 inside) → M5.
 
-    No IO, no side effects. Returns (SystemOutput, MCResult).
+    No IO, no side effects. Returns (SystemOutput, MCResult, ach_log_odds).
     MC is the single source of truth for T samples and buffer trajectory.
+    ach_log_odds is the accumulated log-odds for persistence across runs.
     """
     # M1: ACH Bayesian inference (physical/market evidence only)
-    posterior = run_ach(
+    posterior, ach_log_odds = run_ach(
         observations, h3_suspended=params.h3_suspended,
         h3_prior=params.h3_prior, o01_trend=o01_trend,
+        prior_log_odds=prior_log_odds,
+        prior_h3_suspended=prior_h3_suspended,
+        prior_h3_posterior=prior_h3_posterior,
     )
 
     # Infer SPR trigger day from O13 observations
@@ -142,7 +149,7 @@ def engine_run(
         expected_total_gap=expected_gap,
         consistency_flags=flags,
     )
-    return so, mc_result
+    return so, mc_result, ach_log_odds
 
 
 def _check_consistency(
@@ -357,13 +364,25 @@ async def run_pipeline(config: dict) -> dict:
             result["h3_unfrozen"] = True
         controls = get_controls(db_path)
         confidence = compute_confidence_level(db_path)
-        so, mc_result = engine_run(
+        # Load persisted ACH state for cross-run accumulation
+        from hormuz.infra.db import get_ach_state, save_ach_state, ACHState
+        prev_ach = get_ach_state(db_path)
+        so, mc_result, ach_log_odds = engine_run(
             constants, params, all_obs, controls, events=events,
             mc_n=config.get("mc", {}).get("n", 10000),
             seed=config.get("mc", {}).get("seed", 42),
             o01_trend=o01_trend,
             schelling_signals=llm_signals,
+            prior_log_odds=prev_ach.log_odds if prev_ach else None,
+            prior_h3_suspended=prev_ach.h3_suspended if prev_ach else None,
+            prior_h3_posterior=prev_ach.h3_posterior if prev_ach else None,
         )
+        # Persist updated ACH state
+        save_ach_state(db_path, ACHState(
+            log_odds=ach_log_odds,
+            h3_suspended=params.h3_suspended,
+            h3_posterior=so.ach_posterior.h3,
+        ))
         # Build full signal list for reporter (LLM + control-derived)
         from hormuz.core.m5_game import SignalEvidence
         all_signals = list(llm_signals) if llm_signals else []
