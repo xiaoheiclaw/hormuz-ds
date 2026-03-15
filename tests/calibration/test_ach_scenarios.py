@@ -34,7 +34,7 @@ class TestScenario2019TankerAttacks:
             _obs("O05", 0.4),   # some GPS interference but not primary tactic
             _obs("O06", 0.7),   # multi-node capability (attacks from different vectors)
         ]
-        result, _ = run_ach(obs)
+        result = run_ach(obs)
         assert result.h2 > result.h1, f"Expected H2 > H1, got H1={result.h1:.2f} H2={result.h2:.2f}"
         assert result.h2 > 0.55, f"H2 should be >55%, got {result.h2:.0%}"
 
@@ -50,7 +50,7 @@ class TestScenario2019TankerAttacks:
             _obs("O08", 0.5),   # P&I surcharges
             _obs("O10", 0.7),   # some traffic reduction but not halted
         ]
-        result, _ = run_ach(obs)
+        result = run_ach(obs)
         assert result.h2 > result.h1
 
 
@@ -72,14 +72,14 @@ class TestScenario2019AttacksStop:
             _obs("O05", 0.2),   # GPS spoofing reduced
             _obs("O06", 0.3),   # network appears fragmented (or just quiet)
         ]
-        result, _ = run_ach(obs)
+        result = run_ach(obs)
         assert result.h1 > result.h2, f"Expected H1 > H2, got H1={result.h1:.2f} H2={result.h2:.2f}"
 
     def test_sensitivity_o02_is_strongest_driver(self):
         """O02 (decline rate) should be the strongest H1 signal."""
         # Only O02 saying "sharp decline" — should still push toward H1
         obs_only_o02 = [_obs("O02", 0.9)]
-        result, _ = run_ach(obs_only_o02)
+        result = run_ach(obs_only_o02)
         assert result.h1 > 0.55, f"O02 alone should push H1 > 55%, got {result.h1:.0%}"
 
 
@@ -99,7 +99,7 @@ class TestScenarioFullDepletion:
             _obs("O05", 0.0),   # GPS spoofing gone
             _obs("O06", 0.0),   # network collapsed
         ]
-        result, _ = run_ach(obs)
+        result = run_ach(obs)
         assert result.h1 > 0.85, f"Full depletion: H1 should be >85%, got {result.h1:.0%}"
         assert result.h2 < 0.15, f"Full depletion: H2 should be <15%, got {result.h2:.0%}"
 
@@ -120,7 +120,7 @@ class TestScenarioSustainedBlockade:
             _obs("O05", 0.7),   # complex GPS spoofing maintained
             _obs("O06", 0.8),   # distributed multi-node network
         ]
-        result, _ = run_ach(obs, o01_trend="stable")
+        result = run_ach(obs, o01_trend="stable")
         assert result.h2 > 0.70, f"Sustained blockade: H2 should be >70%, got {result.h2:.0%}"
 
     def test_with_b_group_confirmation(self):
@@ -137,7 +137,7 @@ class TestScenarioSustainedBlockade:
             _obs("O10", 0.2),   # only ~12 ships/day (heavily reduced)
             _obs("O11", 0.8),   # Yanbu loading active (pipeline diversion)
         ]
-        result, _ = run_ach(obs, o01_trend="stable")
+        result = run_ach(obs, o01_trend="stable")
         assert result.h2 > 0.70, f"Full sustained: H2 should be >70%, got {result.h2:.0%}"
 
 
@@ -163,7 +163,7 @@ class TestScenario2024RedSea:
             # O04/O05 omitted — not diagnostic for Houthi (no advanced arsenal baseline)
             _obs("O06", 0.7),   # multiple launch sites across Yemen coast
         ]
-        result, _ = run_ach(obs)
+        result = run_ach(obs)
         assert result.h2 > result.h1, f"Red Sea: H2 should > H1, got H1={result.h1:.2f} H2={result.h2:.2f}"
 
 
@@ -178,7 +178,7 @@ class TestT1aT1bUnbinding:
         obs = [
             _obs("O05", 0.8),   # complex spoofing active
         ]
-        result, _ = run_ach(obs, o01_trend="rising")
+        result = run_ach(obs, o01_trend="rising")
         assert result.h2 > result.h1, "T1a: GPS+rising should favor H2"
 
     def test_t1b_defensive_gps_plus_falling_attacks(self):
@@ -186,8 +186,8 @@ class TestT1aT1bUnbinding:
         obs = [
             _obs("O05", 0.8),
         ]
-        result_rising, _ = run_ach(obs, o01_trend="rising")
-        result_falling, _ = run_ach(obs, o01_trend="falling")
+        result_rising = run_ach(obs, o01_trend="rising")
+        result_falling = run_ach(obs, o01_trend="falling")
         # Both should favor H2, but rising should be stronger
         assert result_rising.h2 > result_falling.h2, \
             f"T1a should give stronger H2 than T1b: rising={result_rising.h2:.2f} falling={result_falling.h2:.2f}"
@@ -195,7 +195,7 @@ class TestT1aT1bUnbinding:
     def test_gps_degrading_favors_h1(self):
         """Low GPS spoofing = EW capability lost → H1."""
         obs = [_obs("O05", 0.2)]
-        result, _ = run_ach(obs)
+        result = run_ach(obs)
         assert result.h1 > result.h2, "Low GPS spoofing should favor H1"
 
 
@@ -207,11 +207,11 @@ class TestSensitivity:
     def test_strong_discriminators_move_posterior_more(self):
         """O02-O05 (strong) should shift posterior more than O01/O06 (moderate)."""
         # Single strong observation (O03 coordination, high = H2)
-        result_strong, _ = run_ach([_obs("O03", 0.8)])
+        result_strong = run_ach([_obs("O03", 0.8)])
         shift_strong = abs(result_strong.h2 - 0.5)
 
         # Single moderate observation (O01 attack freq, high = H2)
-        result_moderate, _ = run_ach([_obs("O01", 0.8)])
+        result_moderate = run_ach([_obs("O01", 0.8)])
         shift_moderate = abs(result_moderate.h2 - 0.5)
 
         assert shift_strong > shift_moderate, \
@@ -231,5 +231,5 @@ class TestSensitivity:
             _obs("O10", 1.0),
             _obs("O11", 0.1),
         ]
-        result, _ = run_ach(obs)
+        result = run_ach(obs)
         assert result.h1 <= 0.96, f"Cap should hold: H1={result.h1:.0%}"

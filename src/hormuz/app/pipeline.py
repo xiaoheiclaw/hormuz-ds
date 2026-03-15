@@ -40,23 +40,17 @@ def engine_run(
     seed: int | None = None,
     o01_trend: str = "stable",
     schelling_signals: list | None = None,
-    prior_log_odds: float | None = None,
-    prior_h3_suspended: bool | None = None,
-    prior_h3_posterior: float | None = None,
-) -> tuple[SystemOutput, MCResult, float]:
+) -> tuple[SystemOutput, MCResult]:
     """Pure compute chain: M1 → MC (M2+M3+M4 inside) → M5.
 
-    No IO, no side effects. Returns (SystemOutput, MCResult, ach_log_odds).
+    No IO, no side effects. Returns (SystemOutput, MCResult).
     MC is the single source of truth for T samples and buffer trajectory.
-    ach_log_odds is the accumulated log-odds for persistence across runs.
+    ACH is stateless — pass full observation snapshot for correct result.
     """
     # M1: ACH Bayesian inference (physical/market evidence only)
-    posterior, ach_log_odds = run_ach(
+    posterior = run_ach(
         observations, h3_suspended=params.h3_suspended,
         h3_prior=params.h3_prior, o01_trend=o01_trend,
-        prior_log_odds=prior_log_odds,
-        prior_h3_suspended=prior_h3_suspended,
-        prior_h3_posterior=prior_h3_posterior,
     )
 
     # Infer SPR trigger day from O13 observations
@@ -149,7 +143,7 @@ def engine_run(
         expected_total_gap=expected_gap,
         consistency_flags=flags,
     )
-    return so, mc_result, ach_log_odds
+    return so, mc_result
 
 
 def _check_consistency(
@@ -364,25 +358,22 @@ async def run_pipeline(config: dict) -> dict:
             result["h3_unfrozen"] = True
         controls = get_controls(db_path)
         confidence = compute_confidence_level(db_path)
-        # Load persisted ACH state for cross-run accumulation
-        from hormuz.infra.db import get_ach_state, save_ach_state, ACHState
-        prev_ach = get_ach_state(db_path)
-        so, mc_result, ach_log_odds = engine_run(
-            constants, params, all_obs, controls, events=events,
+        # ACH uses full DB observation snapshot (latest per O-series) for
+        # idempotent Bayesian update. No cross-run state needed — same
+        # observations always produce same posterior.
+        db_obs = get_observations(db_path)
+        # Take latest value per O-series ID
+        latest_by_id: dict[str, Observation] = {}
+        for o in sorted(db_obs, key=lambda x: x.timestamp):
+            latest_by_id[o.id] = o
+        ach_obs = list(latest_by_id.values())
+        so, mc_result = engine_run(
+            constants, params, ach_obs, controls, events=events,
             mc_n=config.get("mc", {}).get("n", 10000),
             seed=config.get("mc", {}).get("seed", 42),
             o01_trend=o01_trend,
             schelling_signals=llm_signals,
-            prior_log_odds=prev_ach.log_odds if prev_ach else None,
-            prior_h3_suspended=prev_ach.h3_suspended if prev_ach else None,
-            prior_h3_posterior=prev_ach.h3_posterior if prev_ach else None,
         )
-        # Persist updated ACH state
-        save_ach_state(db_path, ACHState(
-            log_odds=ach_log_odds,
-            h3_suspended=params.h3_suspended,
-            h3_posterior=so.ach_posterior.h3,
-        ))
         # Build full signal list for reporter (LLM + control-derived)
         from hormuz.core.m5_game import SignalEvidence
         all_signals = list(llm_signals) if llm_signals else []
