@@ -3,11 +3,47 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime
 from pathlib import Path
 
 import click
 import yaml
+
+
+def _write_pipeline_log(result: dict, project_root: Path) -> None:
+    """Append one JSON line per pipeline run to data/logs/pipeline.log."""
+    log_dir = project_root / "data" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "pipeline.log"
+
+    entry: dict = {
+        "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "steps": result.get("steps_completed", 0),
+        "errors": result.get("errors", []),
+        "articles_total": result.get("articles_total"),
+        "articles_new": result.get("articles_new"),
+    }
+    so = result.get("system_output")
+    if so:
+        entry["ach"] = {"h1": round(so.ach_posterior.h1, 3), "h2": round(so.ach_posterior.h2, 3)}
+        entry["t_expected"] = round(so.t_weighted_mean, 1)
+        entry["t_p50"] = round(so.t_total_percentiles.get("p50", 0), 1)
+        pw = so.path_probabilities
+        entry["paths"] = {"a": round(pw.a, 3), "b": round(pw.b, 3), "c": round(pw.c, 3)}
+        entry["gap"] = round(so.expected_total_gap, 0)
+        entry["confidence"] = so.confidence_level
+        if so.consistency_flags:
+            entry["flags"] = so.consistency_flags
+    pos = result.get("positions")
+    if pos:
+        entry["positions"] = {
+            "energy": pos.energy_pct, "vol": pos.vol_pct,
+            "recession": pos.recession_pct, "actions": pos.actions,
+        }
+
+    with open(log_path, "a") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 def _project_root() -> Path:
@@ -70,6 +106,9 @@ def run(config_path, mc_n, seed):
         click.echo(f"  GrossGap: {so.gross_gap_mbd:.1f} mbd")
         click.echo(f"  ACH: H1={so.ach_posterior.h1:.2f} H2={so.ach_posterior.h2:.2f}")
         click.echo(f"  Paths: A={so.path_probabilities.a:.0%} B={so.path_probabilities.b:.0%} C={so.path_probabilities.c:.0%}")
+
+    # Append structured log to data/logs/pipeline.log
+    _write_pipeline_log(result, _project_root())
 
 
 @cli.command()
