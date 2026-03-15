@@ -80,8 +80,11 @@ def engine_run(
     buffer_traj = mc_result.buffer_trajectory
     net_gap_traj = compute_net_gap_trajectory(gross_gap, buffer_traj)
 
-    # Path total gaps (representative durations)
-    path_t = {"A": 28, "B": 84, "C": 180}
+    # Path total gaps and trajectories — use MC actual per-path T means
+    path_t = {
+        p: max(1, int(round(mc_result.path_t_means.get(p, fallback))))
+        for p, fallback in [("A", 28), ("B", 84), ("C", 180)]
+    }
     path_total_gaps = {
         path: integrate_total_gap(gross_gap, buffer_traj, t_end=t)
         for path, t in path_t.items()
@@ -111,12 +114,14 @@ def engine_run(
     )
     path_probs = adjust_path_weights(mc_base, signals=game_signals)
 
-    # Expected total gap — use MC sample means (more accurate than fixed-duration proxy)
+    # Expected total gap — use MC physical weights × MC sample means (consistent pair)
+    # M5-adjusted weights shift path probabilities but cannot change the physical gap
+    # within each path, so mixing M5 weights with MC means is a category error.
     mc_means = mc_result.path_total_gap_means
     expected_gap = (
-        path_probs.a * mc_means["A"]
-        + path_probs.b * mc_means["B"]
-        + path_probs.c * mc_means["C"]
+        mc_base.a * mc_means["A"]
+        + mc_base.b * mc_means["B"]
+        + mc_base.c * mc_means["C"]
     )
 
     # Consistency flags

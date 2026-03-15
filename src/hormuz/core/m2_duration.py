@@ -172,18 +172,24 @@ def estimate_t_total(
         t_total[jump_mask] = new_t_total
 
         # Sync T1/T2 with jumped T_total to maintain consistency
-        # Ceasefire: political end before clearance → T1 = new total, T2 = 0
-        # Escalation: attack phase extends → scale T1, keep T2
+        # Ceasefire: political end before clearance → T1 absorbs all, T2 = 0
+        # Escalation: attack phase extends → T1 gets the surplus, T2 capped
         jump_indices = np.where(jump_mask)[0]
         for j, idx in enumerate(jump_indices):
+            available = new_t_total[j] - deployment_gap[idx]
             if short_mask[j]:
                 # Ceasefire: conflict ends before sweep phase
-                t1[idx] = new_t_total[j] - deployment_gap[idx]
+                t1[idx] = max(1.0, available)
                 t2[idx] = 0.0
             else:
-                # Escalation: longer attack, sweep unchanged
-                t1[idx] = new_t_total[j] - deployment_gap[idx] - t2[idx]
-            t1[idx] = max(1.0, t1[idx])
+                # Escalation: T1 extends, T2 kept only if it fits
+                if t2[idx] < available - 1.0:
+                    t1[idx] = available - t2[idx]
+                else:
+                    # T2 exceeds budget — escalation means prolonged attack,
+                    # allocate 75% to T1 (attack) and 25% to T2 (sweep)
+                    t1[idx] = max(1.0, available * 0.75)
+                    t2[idx] = max(1.0, available * 0.25)
 
     return t1, t2, t_total
 
