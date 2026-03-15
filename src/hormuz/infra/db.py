@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -99,14 +98,6 @@ CREATE TABLE IF NOT EXISTS article_observations (
     confidence TEXT,
     batch_run TEXT,
     created_at TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS ach_state (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    log_odds REAL NOT NULL DEFAULT 0.0,
-    h3_suspended INTEGER NOT NULL DEFAULT 1,
-    h3_posterior REAL,
-    updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_obs_id_ts ON observations(id, timestamp);
@@ -471,46 +462,3 @@ def get_article_observations(
         {"article_id": r[0], "obs_id": r[1], "confidence": r[2], "batch_run": r[3], "created_at": r[4]}
         for r in rows
     ]
-
-
-# ── ACH state persistence ────────────────────────────────────────────
-
-@dataclass
-class ACHState:
-    """Persisted ACH accumulator across pipeline runs."""
-    log_odds: float = 0.0           # accumulated log(H1/H2) in 2-way mode
-    h3_suspended: bool = True
-    h3_posterior: float | None = None  # H3 probability when 3-way active
-
-
-def get_ach_state(path: Path) -> ACHState | None:
-    """Load persisted ACH state, or None if no prior run."""
-    conn = sqlite3.connect(path)
-    row = conn.execute(
-        "SELECT log_odds, h3_suspended, h3_posterior FROM ach_state WHERE id = 1"
-    ).fetchone()
-    conn.close()
-    if row is None:
-        return None
-    return ACHState(
-        log_odds=row[0],
-        h3_suspended=bool(row[1]),
-        h3_posterior=row[2],
-    )
-
-
-def save_ach_state(path: Path, state: ACHState) -> None:
-    """Upsert ACH state (single row, id=1)."""
-    conn = sqlite3.connect(path)
-    conn.execute(
-        """INSERT INTO ach_state (id, log_odds, h3_suspended, h3_posterior, updated_at)
-           VALUES (1, ?, ?, ?, datetime('now'))
-           ON CONFLICT(id) DO UPDATE SET
-             log_odds = excluded.log_odds,
-             h3_suspended = excluded.h3_suspended,
-             h3_posterior = excluded.h3_posterior,
-             updated_at = excluded.updated_at""",
-        (state.log_odds, int(state.h3_suspended), state.h3_posterior),
-    )
-    conn.commit()
-    conn.close()

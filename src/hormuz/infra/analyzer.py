@@ -178,7 +178,7 @@ irgc_fragmentation — Signs of IRGC internal disagreement.
 Only include if articles contain SPECIFIC evidence. Empty array if nothing detected.
 
 sweep_ships — Number of MCM (mine countermeasure) vessels deployed to Gulf/Hormuz region.
-  Current default: 6. Update ONLY if articles mention specific deployment numbers.
+  Current default: 4 (post-Avenger decom, ~2-4 LCS + 2 UK Hunt-class). Update ONLY if articles mention specific deployment numbers.
   Count dedicated MCM ships + MCM-capable vessels actively assigned to Gulf mine clearance.
   Do NOT count general warships or carrier groups — only mine warfare assets.
   News phrases: "X minesweepers deployed to Gulf", "MCM squadron arrived in Bahrain",

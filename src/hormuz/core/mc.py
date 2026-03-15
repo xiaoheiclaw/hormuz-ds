@@ -104,12 +104,14 @@ def run_monte_carlo(
         "B": (t_total >= b1) & (t_total <= b2),
         "C": t_total > b2,
     }
+    # Fallback means for empty paths (midpoint of range)
+    _FALLBACK_T = {"A": b1 / 2, "B": (b1 + b2) / 2, "C": b2 * 1.5}
     for path, mask in masks.items():
         if mask.any():
             path_t_means[path] = float(np.mean(t_total[mask]))
             path_gap_means[path] = float(np.mean(total_gap_samples[mask]))
         else:
-            path_t_means[path] = 0.0
+            path_t_means[path] = _FALLBACK_T[path]
             path_gap_means[path] = 0.0
 
     # Path-weighted expected T (for decision-making, captures tail risk)
