@@ -242,6 +242,7 @@ async def run_pipeline(config: dict) -> dict:
             )
             llm_obs = extraction.observations
             llm_signals = extraction.signals
+            result["parameter_updates"] = extraction.parameter_updates
 
             # Store articles and provenance
             batch_run = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -329,6 +330,12 @@ async def run_pipeline(config: dict) -> dict:
     try:
         constants = load_constants(configs_dir / "constants.yaml")
         params = load_parameters(configs_dir / "parameters.yaml")
+        # Apply LLM-extracted parameter updates (e.g., sweep_ships from MCM deployment news)
+        _PARAM_MAP = {"sweep_ships": "sweep_ships"}
+        for pu in result.get("parameter_updates", []):
+            field_name = _PARAM_MAP.get(pu.get("param"))
+            if field_name and hasattr(params, field_name):
+                params = params.override(**{field_name: int(pu["value"])})
         # H3 unfreeze: O14 >= 0.7 = strong external resupply evidence → 3-way ACH
         if o14:
             params = params.override(h3_suspended=False)

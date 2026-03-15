@@ -24,7 +24,8 @@ If articles don't mention a specific observation, OMIT it rather than guessing 0
 Return JSON only:
 {{
   "observations": [{{"id": "O01", "value": 0.8, "confidence": "high"}}, ...],
-  "signals": [{{"key": "external_mediation", "evidence": "high"}}, ...]
+  "signals": [{{"key": "external_mediation", "evidence": "high"}}, ...],
+  "parameter_updates": [{{"param": "sweep_ships", "value": 4, "source": "quoted text or reasoning"}}, ...]
 }}
 
 ## A-GROUP: Threat Status (feed ACH engine, 0-1 scale)
@@ -172,6 +173,18 @@ irgc_fragmentation — Signs of IRGC internal disagreement.
   "hardliners vs pragmatists split", "reports of insubordination", "IRGC leadership shake-up"
   NOTE: Only include if US inconsistency also present (validates interpretation).
 
+## PARAMETER UPDATES (include in "parameter_updates" array if detected)
+
+Only include if articles contain SPECIFIC evidence. Empty array if nothing detected.
+
+sweep_ships — Number of MCM (mine countermeasure) vessels deployed to Gulf/Hormuz region.
+  Current default: 6. Update ONLY if articles mention specific deployment numbers.
+  Count dedicated MCM ships + MCM-capable vessels actively assigned to Gulf mine clearance.
+  Do NOT count general warships or carrier groups — only mine warfare assets.
+  News phrases: "X minesweepers deployed to Gulf", "MCM squadron arrived in Bahrain",
+  "mine countermeasure vessels", "USS Avenger-class deployed", "Royal Navy Hunt-class",
+  "coalition mine clearance task force of X ships", "MCM force reduced to X vessels"
+
 ## RULES
 - Extract observations you can infer from the articles. Reasonable inference is OK — do not require exact quotes.
 - If articles describe active conflict but don't give exact attack counts, estimate based on intensity described (e.g., "heavy fighting" → O01 ≈ 0.7-0.8).
@@ -207,9 +220,10 @@ def build_extraction_prompt(conflict_day: int | None = None, previous_obs: dict[
 
 @dataclass
 class ExtractionResult:
-    """Combined extraction output: observations + Schelling signals + provenance."""
+    """Combined extraction output: observations + Schelling signals + parameter updates + provenance."""
     observations: list[Observation] = field(default_factory=list)
     signals: list[SignalEvidence] = field(default_factory=list)
+    parameter_updates: list[dict] = field(default_factory=list)
     provenance: list[dict] = field(default_factory=list)
 
 
@@ -219,7 +233,7 @@ async def _extract_batch(
     ts: datetime,
     conflict_day: int | None = None,
     previous_obs: dict[str, float] | None = None,
-) -> tuple[list[Observation], list[SignalEvidence], list[dict]]:
+) -> tuple[list[Observation], list[SignalEvidence], list[dict], list[dict]]:
     """Extract observations and signals from a single batch of articles."""
     text_parts = []
     for a in articles:
@@ -265,7 +279,14 @@ async def _extract_batch(
         if key in valid_keys:
             signals.append(SignalEvidence(key=key, evidence=evidence))
 
-    return observations, signals, provenance
+    # Parameter updates
+    valid_params = {"sweep_ships"}
+    param_updates: list[dict] = []
+    for pu in result.get("parameter_updates", []):
+        if isinstance(pu, dict) and pu.get("param") in valid_params:
+            param_updates.append(pu)
+
+    return observations, signals, provenance, param_updates
 
 
 async def extract_observations(
@@ -291,13 +312,14 @@ async def extract_observations(
     all_obs: list[Observation] = []
     all_signals: list[SignalEvidence] = []
     all_provenance: list[dict] = []
+    all_param_updates: list[dict] = []
     import asyncio as _aio
 
     for i in range(0, len(articles), batch_size):
         batch = articles[i : i + batch_size]
         for attempt in range(3):
             try:
-                batch_obs, batch_sigs, batch_prov = await _extract_batch(
+                batch_obs, batch_sigs, batch_prov, batch_params = await _extract_batch(
                     batch, llm, ts,
                     conflict_day=conflict_day,
                     previous_obs=previous_obs,
@@ -305,6 +327,7 @@ async def extract_observations(
                 all_obs.extend(batch_obs)
                 all_signals.extend(batch_sigs)
                 all_provenance.extend(batch_prov)
+                all_param_updates.extend(batch_params)
                 break
             except Exception:
                 if attempt < 2:
@@ -328,8 +351,14 @@ async def extract_observations(
         if s.key not in best_sigs or s.evidence > best_sigs[s.key].evidence:
             best_sigs[s.key] = s
 
+    # Deduplicate parameter updates: keep last per param name
+    best_params: dict[str, dict] = {}
+    for pu in all_param_updates:
+        best_params[pu["param"]] = pu
+
     return ExtractionResult(
         observations=[obs for obs, _ in best.values()],
         signals=list(best_sigs.values()),
+        parameter_updates=list(best_params.values()),
         provenance=all_provenance,
     )
