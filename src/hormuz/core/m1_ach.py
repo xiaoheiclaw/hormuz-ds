@@ -127,6 +127,8 @@ def get_likelihood_ratio(obs_id: str, value: float, context: dict) -> dict[str, 
             trend = context.get("O01_trend", "unknown")
             if trend == "rising":
                 return {"H1": 0.77, "H2": 1.3}
+            elif trend == "unknown":
+                return {"H1": 1.0, "H2": 1.0}  # no trend data → neutral
             else:
                 return {"H1": 0.95, "H2": 1.05}
         else:

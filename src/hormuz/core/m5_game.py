@@ -73,8 +73,8 @@ def adjust_path_weights(
 
     signal_keys = {s.key for s in signals}
 
-    # Filter valid signals with prereq check
-    active: list[tuple[SignalDef, float]] = []  # (def, evidence)
+    # Filter valid signals with prereq check, deduplicate by key (keep max evidence)
+    best_by_key: dict[str, tuple[SignalDef, float]] = {}
     for sig in signals:
         sdef = _SIGNAL_DEFS.get(sig.key)
         if sdef is None:
@@ -84,8 +84,10 @@ def adjust_path_weights(
             continue
         if sig.evidence <= 0:
             continue
-        active.append((sdef, sig.evidence))
+        if sig.key not in best_by_key or sig.evidence > best_by_key[sig.key][1]:
+            best_by_key[sig.key] = (sdef, sig.evidence)
 
+    active = list(best_by_key.values())
     if not active:
         return base
 
