@@ -33,6 +33,7 @@ class Parameters(BaseModel):
     h3_suspended: bool = True                        # P08
     h3_prior: float = 0.10                           # P09
     effective_disruption_rate: float = 0.80           # P10
+    regime_jump_rate: float = 0.08                    # tail scenario injection rate
 
     def override(self, **kwargs: object) -> Parameters:
         """Return new instance with overridden fields."""

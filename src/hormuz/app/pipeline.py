@@ -320,7 +320,11 @@ async def run_pipeline(config: dict) -> dict:
     # O14 >= 0.7 = strong evidence (satellite/photo or confirmed), triggers H3 unfreeze
     o14 = next((o for o in all_obs if o.id == "O14" and o.value >= 0.7), None)
 
-    # Extract events from observations for M2 duration model
+    # Extract events from observations for M2 duration model.
+    # NOTE: O06 and O10 also feed ACH (M1). This is intentional dual use:
+    # - In ACH: O06/O10 assess capability persistence (H1 vs H2) → affects T1
+    # - Here: O06 low → E2 (sweep fleet attacked, +14d T2); O10 low → E3 (mines confirmed, +7d T2)
+    # The two effects operate on different phases (T1 vs T2) and are physically independent.
     events: dict[str, bool] = {}
     # E2 (minesweeper attack): O06 sharp drop indicates coastal nodes destroyed
     o06_val = next((o.value for o in all_obs if o.id == "O06"), None)

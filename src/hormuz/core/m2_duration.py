@@ -139,6 +139,7 @@ def estimate_t_total(
     params: Parameters,
     events: dict[str, bool],
     mine_signals: dict[str, float] | None = None,
+    regime_jump_rate: float = 0.08,
     n: int = 10000,
     seed: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -160,7 +161,7 @@ def estimate_t_total(
 
     # Regime jumps: ~8% of samples get override to tail scenarios
     # Probability of short (ceasefire) vs long (escalation) scales with ACH
-    jump_mask = rng.random(n) < 0.08
+    jump_mask = rng.random(n) < regime_jump_rate
     n_jumps = jump_mask.sum()
     if n_jumps > 0:
         # H1 → ceasefire; H2+H3 → escalation (H3 = sustained resupply = escalation-favoring)

@@ -73,7 +73,8 @@ def run_monte_carlo(
     # Sample T1, T2, T_total via M2 (includes regime jumps)
     mc_seed = int(rng.integers(0, 2**31))
     t1, t2, t_total = estimate_t_total(
-        posterior, params, events, mine_signals=mine_signals, n=n, seed=mc_seed,
+        posterior, params, events, mine_signals=mine_signals,
+        regime_jump_rate=params.regime_jump_rate, n=n, seed=mc_seed,
     )
 
     # Pre-compute buffer trajectory — at least 181 days for Path C gap integration
