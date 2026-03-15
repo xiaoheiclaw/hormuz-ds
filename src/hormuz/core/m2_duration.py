@@ -68,19 +68,45 @@ def estimate_t1(posterior: ACHPosterior, n: int = 10000, seed: int | None = None
 def estimate_t2(
     params: Parameters,
     events: dict[str, bool],
+    posterior: ACHPosterior | None = None,
     n: int = 10000,
     seed: int | None = None,
 ) -> np.ndarray:
     """Sample T2: mine clearance time via stock-flow model.
 
-    mines_in_water ~ Uniform(range), sweep_time = mines / (ships × rate_per_ship).
+    mines_in_water conditioned on ACH:
+      H1 (exhaustion): 15-50 — mining capability degraded
+      H2 (preserved):  40-120 — sustained mining, higher stock
+      H3 (resupply):   50-150 — external supply of advanced mines
+    Fallback: params.mines_in_water_range (20-100) if no posterior.
+
+    sweep_time = mines / (ships × rate_per_ship).
     Add event jumps for E2/E3/C2.
     """
     rng = np.random.default_rng(seed)
-    lo, hi = params.mines_in_water_range
 
-    # Sample mines in water
-    mines = rng.uniform(lo, hi, n)
+    # ACH-conditioned mine counts
+    if posterior is not None:
+        h3_w = posterior.h3 if posterior.h3 is not None else 0.0
+        total_w = posterior.h1 + posterior.h2 + h3_w
+        if total_w == 0:
+            total_w = 1.0
+        w_h1 = posterior.h1 / total_w
+        w_h2 = posterior.h2 / total_w
+
+        u = rng.random(n)
+        mask_h1 = u < w_h1
+        mask_h2 = (u >= w_h1) & (u < w_h1 + w_h2)
+        mask_h3 = ~mask_h1 & ~mask_h2
+
+        mines = np.empty(n)
+        mines[mask_h1] = rng.uniform(15, 50, mask_h1.sum())
+        mines[mask_h2] = rng.uniform(40, 120, mask_h2.sum())
+        if mask_h3.any():
+            mines[mask_h3] = rng.uniform(50, 150, mask_h3.sum())
+    else:
+        lo, hi = params.mines_in_water_range
+        mines = rng.uniform(lo, hi, n)
 
     # Sweep rate: ~0.5 mines/day/ship, uncertain (0.3-0.8 range)
     rate_per_ship = rng.uniform(0.3, 0.8, n)
@@ -119,7 +145,7 @@ def estimate_t_total(
 
     # Use sub-seeds for reproducibility
     t1 = estimate_t1(posterior, n=n, seed=rng.integers(0, 2**31))
-    t2 = estimate_t2(params, events=events, n=n, seed=rng.integers(0, 2**31))
+    t2 = estimate_t2(params, events=events, posterior=posterior, n=n, seed=rng.integers(0, 2**31))
     deployment_gap = rng.uniform(7, 14, n)
 
     t_total = t1 + deployment_gap + t2
