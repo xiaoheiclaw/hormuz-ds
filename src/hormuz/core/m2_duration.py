@@ -112,8 +112,9 @@ def estimate_t2(
 
     mines = rng.uniform(lo, hi, n)
 
-    # Sweep rate: ~0.5 mines/day/ship, uncertain (0.3-0.8 range)
-    rate_per_ship = rng.uniform(0.3, 0.8, n)
+    # Sweep rate: modern MCM with sonar/UUV/ROV, ~2.5 mines/day/ship
+    # Range 1.5-4.0 accounts for depth, currents, mine type uncertainty
+    rate_per_ship = rng.uniform(1.5, 4.0, n)
     sweep_days = mines / (params.sweep_ships * rate_per_ship)
 
     # Mine type penalty: mixed types take ~20% longer
@@ -121,7 +122,7 @@ def estimate_t2(
 
     # Add noise
     sweep_days += rng.normal(0, 2, n)
-    sweep_days = np.maximum(sweep_days, 7)  # minimum 1 week
+    sweep_days = np.maximum(sweep_days, 3)  # minimum 3 days (deploy + first pass)
 
     # Event jumps
     for event_id, jump_days in _EVENT_JUMPS.items():

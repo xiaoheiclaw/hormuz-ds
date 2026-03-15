@@ -27,7 +27,7 @@ def test_t2_basic():
     params = Parameters()
     samples = estimate_t2(params, events={}, n=1000, seed=42)
     median = np.median(samples)
-    assert 20 <= median <= 60  # ~5 weeks median
+    assert 3 <= median <= 15  # modern MCM: days not weeks
 
 
 def test_t2_event_e3():
