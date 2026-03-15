@@ -95,7 +95,7 @@ def run(config_path, mc_n, seed):
 
     steps = result.get("steps_completed", 0)
     errors = result.get("errors", [])
-    click.echo(f"Pipeline completed: {steps}/7 steps")
+    click.echo(f"Pipeline completed: {steps}/6 steps")
     if errors:
         for e in errors:
             click.echo(f"  ⚠ {e}", err=True)
