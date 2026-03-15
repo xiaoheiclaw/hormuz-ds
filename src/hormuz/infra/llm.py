@@ -24,17 +24,15 @@ def _extract_json(text: str) -> dict:
     m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     if m:
         return json.loads(m.group(1).strip())
-    # Find first { ... } block
+    # Find first JSON object using decoder (handles nested braces in strings correctly)
     start = text.find("{")
     if start >= 0:
-        depth = 0
-        for i, c in enumerate(text[start:], start):
-            if c == "{":
-                depth += 1
-            elif c == "}":
-                depth -= 1
-                if depth == 0:
-                    return json.loads(text[start : i + 1])
+        try:
+            decoder = json.JSONDecoder()
+            obj, _ = decoder.raw_decode(text, start)
+            return obj
+        except json.JSONDecodeError:
+            pass
     raise json.JSONDecodeError("No JSON found in LLM response", text, 0)
 
 
@@ -83,7 +81,8 @@ class ClaudeAPIBackend:
                     resp.raise_for_status()
                     content = resp.json()["content"][0]["text"]
                     return _extract_json(content)
-            except httpx.RemoteProtocolError as e:
+            except (httpx.RemoteProtocolError, httpx.HTTPStatusError,
+                    httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e
                 await asyncio.sleep(2 ** attempt)
         raise last_exc  # type: ignore[misc]

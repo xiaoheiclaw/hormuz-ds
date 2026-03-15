@@ -177,7 +177,8 @@ def compute_o02_from_history(path: Path, lookback_days: int = 7) -> Observation 
     # O02: 0=rising, 0.5=stable, 1.0=sharp decline
     # If recent < older → declining → high O02
     if older_avg == 0:
-        change = 0.5
+        # Zero baseline → any recent activity = attacks rising (O02 low)
+        change = 0.0 if recent_avg > 0 else 0.5
     else:
         ratio = (older_avg - recent_avg) / older_avg  # positive = decline
         change = max(0.0, min(1.0, 0.5 + ratio))  # map [-1,1] → [0,1] centered at 0.5

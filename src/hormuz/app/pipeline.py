@@ -341,7 +341,12 @@ async def run_pipeline(config: dict) -> dict:
         for pu in result.get("parameter_updates", []):
             field_name = _PARAM_MAP.get(pu.get("param"))
             if field_name and hasattr(params, field_name):
-                params = params.override(**{field_name: int(pu["value"])})
+                try:
+                    params = params.override(**{field_name: int(float(pu["value"]))})
+                except (TypeError, ValueError, KeyError):
+                    result.setdefault("errors", []).append(
+                        f"Invalid param update: {pu}"
+                    )
         # H3 unfreeze: O14 >= 0.7 = strong external resupply evidence → 3-way ACH
         if o14:
             params = params.override(h3_suspended=False)

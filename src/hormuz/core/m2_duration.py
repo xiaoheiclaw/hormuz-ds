@@ -110,6 +110,7 @@ def estimate_t2(
             lo = max(lo, 50)
             hi = max(hi, 150)
 
+    hi = max(hi, lo + 1)  # guard against lo >= hi from overlapping adjustments
     mines = rng.uniform(lo, hi, n)
 
     # Sweep rate: LCS MCM pkg + unmanned systems (post-Avenger decom)
