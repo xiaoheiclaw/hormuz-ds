@@ -99,6 +99,9 @@ CREATE TABLE IF NOT EXISTS article_observations (
     batch_run TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_obs_id_ts ON observations(id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_sysout_created ON system_outputs(created_at);
 """
 
 

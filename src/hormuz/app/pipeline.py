@@ -379,7 +379,23 @@ async def run_pipeline(config: dict) -> dict:
 
     # Step 4: Position evaluation
     try:
-        pos = evaluate_positions(so, brent_price=brent_price)
+        # Count consecutive days Brent closed below $80 (stop-loss rule)
+        brent_below_80_days = 0
+        try:
+            import yfinance as yf
+            brent_hist = yf.Ticker("BZ=F").history(period="7d")
+            if not brent_hist.empty:
+                for close in reversed(brent_hist["Close"].tolist()):
+                    if close < 80:
+                        brent_below_80_days += 1
+                    else:
+                        break
+        except Exception:
+            pass  # fail open — don't block position eval for market data issues
+        pos = evaluate_positions(
+            so, brent_price=brent_price,
+            brent_below_80_days=brent_below_80_days,
+        )
         result["positions"] = pos
         result["steps_completed"] += 1
     except Exception as e:
@@ -403,7 +419,7 @@ async def run_pipeline(config: dict) -> dict:
             mc_result=mc_result,
             params=params,
             output_path=output_html,
-            conflict_start=config.get("conflict_start", "2026-03-01"),
+            conflict_start=config.get("conflict", {}).get("start_date", "2026-03-01"),
             brent_price=brent_price,
             position_result=result.get("positions"),
             game_signals=result.get("schelling_signals", []),

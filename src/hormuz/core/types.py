@@ -28,7 +28,7 @@ class Parameters(BaseModel):
     sweep_ships: int = 4                             # P03: post-Avenger decom
     pipeline_max_mbd: float = 4.0                    # P04
     pipeline_ramp_weeks: float = 2.5                 # P05
-    spr_rate_mean_mbd: float = 2.5                   # P06
+    spr_rate_mean_mbd: float = 2.0                   # P06: aligned with config
     spr_pump_min_days: int = 13                      # P07: ~2.5 weeks hard delay
     h3_suspended: bool = True                        # P08
     h3_prior: float = 0.10                           # P09
