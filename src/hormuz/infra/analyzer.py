@@ -208,6 +208,16 @@ sweep_ships — Number of MCM (mine countermeasure) vessels deployed to Gulf/Hor
 - O01-O06, O08, O10, O11, O14: stay within [0, 1].
 - O07: percentage points. O09: WS points. O12: $/mt. O13: mbd.
 - signals: array of objects with "key" and "evidence" (high/medium/low). Empty array if no signals detected. Most days will be empty.
+
+*** STABILITY RULE (CRITICAL) ***
+Previous values are provided as baseline. Your output should be CONTINUOUS with them:
+- A shift of ±0.1 from previous is NORMAL (new articles add marginal info).
+- A shift of ±0.2 requires CLEAR evidence in the articles (e.g., a specific event reported).
+- A shift of ±0.3+ requires STRONG, EXPLICIT evidence (confirmed event, named source, specific numbers).
+- If articles don't contain clear evidence for a large shift, KEEP the previous value ±0.1.
+Example: Previous O04=0.75. Articles mention "drone attack on Dubai airport" but no analysis of
+IRGC weapon mix changing → O04 stays 0.7-0.8, NOT 0.4. Only explicit reporting like "IRGC has
+exhausted its ballistic missile stocks and switched to cheap drones" justifies O04=0.3-0.4.
 """
 
 

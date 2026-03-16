@@ -27,7 +27,7 @@ from hormuz.core.mc import MCResult, run_monte_carlo
 # These are imported for run_pipeline but may be mocked in tests
 from hormuz.infra.ingester import fetch_readwise_articles, fetch_market_data, fetch_spr_release, fetch_bunker_spread, get_calibration_data, bwet_to_vlcc_obs, parse_readwise_articles
 from hormuz.infra.analyzer import extract_observations
-from hormuz.infra.db import insert_articles, get_article_ids, insert_article_observations
+from hormuz.infra.db import insert_articles, get_article_ids, insert_article_observations, get_observations
 
 
 def engine_run(
@@ -158,6 +158,54 @@ def _check_consistency(
     if posterior.h1 + posterior.h2 < 0.95 and posterior.h3 is None:
         flags.append("H1+H2 < 0.95 with H3 suspended — prior leak")
     return flags
+
+
+def _smooth_observations(db_path: Path, alpha: float = 0.4) -> list[Observation]:
+    """Build smoothed observation snapshot for ACH — EMA per O-series.
+
+    alpha=0.4: new value gets 40% weight, history gets 60%. This damps
+    single-run LLM noise while still responding to genuine shifts within
+    2-3 runs. Non-LLM sources (yfinance, scraper) use latest raw value.
+
+    Returns one Observation per O-series ID.
+    """
+    from collections import defaultdict
+    db_obs = get_observations(db_path)
+
+    # Group by ID, sorted by time
+    by_id: dict[str, list[Observation]] = defaultdict(list)
+    for o in sorted(db_obs, key=lambda x: x.timestamp):
+        by_id[o.id].append(o)
+
+    # Non-LLM sources: take latest raw value (already reliable)
+    _RAW_SOURCES = {"yfinance", "shipandbunker", "eia", "db:computed", "seed"}
+
+    result: list[Observation] = []
+    for obs_id, obs_list in by_id.items():
+        latest = obs_list[-1]
+        # Skip smoothing for non-LLM sources
+        if any(s in latest.source for s in _RAW_SOURCES):
+            result.append(latest)
+            continue
+
+        # EMA over LLM-extracted values
+        if len(obs_list) == 1:
+            result.append(latest)
+            continue
+
+        ema = obs_list[0].value
+        for o in obs_list[1:]:
+            ema = alpha * o.value + (1 - alpha) * ema
+
+        result.append(Observation(
+            id=obs_id,
+            timestamp=latest.timestamp,
+            value=round(ema, 3),
+            source=f"ema:{latest.source}",
+            noise_note=f"raw={latest.value:.2f} ema(α={alpha})={ema:.3f}",
+        ))
+
+    return result
 
 
 def _get_recent_events(db_path: Path) -> list[dict]:
@@ -393,15 +441,9 @@ async def run_pipeline(config: dict) -> dict:
             result["h3_unfrozen"] = True
         controls = get_controls(db_path)
         confidence = compute_confidence_level(db_path)
-        # ACH uses full DB observation snapshot (latest per O-series) for
-        # idempotent Bayesian update. No cross-run state needed — same
-        # observations always produce same posterior.
-        db_obs = get_observations(db_path)
-        # Take latest value per O-series ID
-        latest_by_id: dict[str, Observation] = {}
-        for o in sorted(db_obs, key=lambda x: x.timestamp):
-            latest_by_id[o.id] = o
-        ach_obs = list(latest_by_id.values())
+        # ACH uses smoothed DB observations — EMA of recent values per O-series
+        # to reduce single-run LLM extraction noise. Idempotent: same DB → same result.
+        ach_obs = _smooth_observations(db_path)
         so, mc_result = engine_run(
             constants, params, ach_obs, controls, events=events,
             mc_n=config.get("mc", {}).get("n", 10000),
