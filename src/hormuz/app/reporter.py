@@ -315,19 +315,25 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 </div>
 </div>
 
-<!-- 7. 近期事件 -->
+<!-- 7. 本轮信息源 -->
 {% if recent_events %}
+{% set obs_zh = {
+  "O01": "攻击频率", "O02": "攻击趋势", "O03": "攻击协调",
+  "O04": "高端武器", "O05": "GPS欺骗", "O06": "网络分布",
+  "O07": "战争险", "O08": "P&I", "O09": "VLCC运费",
+  "O10": "通行量", "O11": "延布装载", "O12": "富查伊拉价差",
+  "O13": "SPR释放", "O14": "外部补给"
+} %}
 <div class="section">
-<div class="sec-label">7 · 近期事件</div>
+<div class="sec-label">7 · 本轮信息源（{{ recent_events|length }} 篇）</div>
 <div class="card">
   <table style="width:100%;font-size:12px;">
-    <tr><th style="width:55%;">事件</th><th>来源</th><th>影响观测</th><th>置信度</th></tr>
+    <tr><th style="width:50%;">文章</th><th>来源</th><th>提取观测</th></tr>
     {% for ev in recent_events %}
     <tr>
-      <td style="color:#e2e8f0;">{{ ev.title[:60] }}{% if ev.title|length > 60 %}…{% endif %}</td>
-      <td style="color:#64748b;">{{ ev.source[:15] }}</td>
-      <td>{% for oid in ev.obs_ids.split(',') %}<span style="background:#1e293b;padding:1px 5px;border-radius:3px;margin-right:3px;font-size:10px;">{{ oid }}</span>{% endfor %}</td>
-      <td style="color:#64748b;">{{ ev.confidence }}</td>
+      <td style="color:#e2e8f0;">{{ ev.title[:55] }}{% if ev.title|length > 55 %}…{% endif %}</td>
+      <td style="color:#64748b;font-size:11px;">{{ ev.source[:12] }}</td>
+      <td>{% for oid in ev.obs_ids.split(',') %}<span style="background:#1e293b;padding:1px 5px;border-radius:3px;margin-right:2px;font-size:10px;" title="{{ obs_zh.get(oid, oid) }}">{{ oid }}</span>{% endfor %}</td>
     </tr>
     {% endfor %}
   </table>

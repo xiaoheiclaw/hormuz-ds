@@ -160,19 +160,27 @@ def _check_consistency(
     return flags
 
 
-def _get_recent_events(db_path: Path, limit: int = 10) -> list[dict]:
-    """Fetch recent articles + which observations they influenced."""
+def _get_recent_events(db_path: Path) -> list[dict]:
+    """Fetch articles from the latest batch run + which observations they influenced."""
     import sqlite3
     conn = sqlite3.connect(db_path)
+    # Find latest batch_run
+    latest = conn.execute(
+        "SELECT batch_run FROM article_observations ORDER BY created_at DESC LIMIT 1"
+    ).fetchone()
+    if not latest:
+        conn.close()
+        return []
+    batch = latest[0]
     rows = conn.execute("""
         SELECT a.title, a.source, GROUP_CONCAT(DISTINCT ao.obs_id) as obs_ids,
                MAX(ao.confidence) as conf
         FROM articles a
         JOIN article_observations ao ON a.id = ao.article_id
+        WHERE ao.batch_run = ?
         GROUP BY a.id
         ORDER BY a.rowid DESC
-        LIMIT ?
-    """, (limit,)).fetchall()
+    """, (batch,)).fetchall()
     conn.close()
     return [
         {"title": r[0], "source": r[1], "obs_ids": r[2] or "", "confidence": r[3] or ""}
@@ -449,7 +457,7 @@ async def run_pipeline(config: dict) -> dict:
         from hormuz.app.reporter import render_status
         output_html = Path(config.get("report_output", "data/status.html"))
         # Fetch recent articles + their observation impacts for dashboard
-        recent_events = _get_recent_events(db_path, limit=10)
+        recent_events = _get_recent_events(db_path)
 
         render_status(
             system_output=so,
