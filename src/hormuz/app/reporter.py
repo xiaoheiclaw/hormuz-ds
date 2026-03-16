@@ -315,9 +315,29 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
 </div>
 </div>
 
-<!-- 7. 仓位 -->
+<!-- 7. 近期事件 -->
+{% if recent_events %}
 <div class="section">
-<div class="sec-label">7 · 仓位建议</div>
+<div class="sec-label">7 · 近期事件</div>
+<div class="card">
+  <table style="width:100%;font-size:12px;">
+    <tr><th style="width:55%;">事件</th><th>来源</th><th>影响观测</th><th>置信度</th></tr>
+    {% for ev in recent_events %}
+    <tr>
+      <td style="color:#e2e8f0;">{{ ev.title[:60] }}{% if ev.title|length > 60 %}…{% endif %}</td>
+      <td style="color:#64748b;">{{ ev.source[:15] }}</td>
+      <td>{% for oid in ev.obs_ids.split(',') %}<span style="background:#1e293b;padding:1px 5px;border-radius:3px;margin-right:3px;font-size:10px;">{{ oid }}</span>{% endfor %}</td>
+      <td style="color:#64748b;">{{ ev.confidence }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+</div>
+{% endif %}
+
+<!-- 8. 仓位 -->
+<div class="section">
+<div class="sec-label">8 · 仓位建议</div>
 <div class="row">
   <div class="col"><div class="card">
     <div class="card-title">能源多头</div>
@@ -528,6 +548,7 @@ def render_status(
     position_result: object | None = None,
     game_signals: list[SignalEvidence] | None = None,
     mc_n: int = 10000,
+    recent_events: list[dict] | None = None,
 ) -> None:
     """Render two-tab HTML dashboard: status + framework reference."""
     so = system_output
@@ -614,6 +635,7 @@ def render_status(
         h3_prior=f"{params.h3_prior}",
         mc_n=mc_n,
         flags=so.consistency_flags,
+        recent_events=recent_events or [],
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

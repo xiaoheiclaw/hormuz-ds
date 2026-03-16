@@ -160,6 +160,26 @@ def _check_consistency(
     return flags
 
 
+def _get_recent_events(db_path: Path, limit: int = 10) -> list[dict]:
+    """Fetch recent articles + which observations they influenced."""
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    rows = conn.execute("""
+        SELECT a.title, a.source, GROUP_CONCAT(DISTINCT ao.obs_id) as obs_ids,
+               MAX(ao.confidence) as conf
+        FROM articles a
+        JOIN article_observations ao ON a.id = ao.article_id
+        GROUP BY a.id
+        ORDER BY a.rowid DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    conn.close()
+    return [
+        {"title": r[0], "source": r[1], "obs_ids": r[2] or "", "confidence": r[3] or ""}
+        for r in rows
+    ]
+
+
 async def run_pipeline(config: dict) -> dict:
     """Full 6-step pipeline orchestrator.
 
@@ -428,6 +448,9 @@ async def run_pipeline(config: dict) -> dict:
     try:
         from hormuz.app.reporter import render_status
         output_html = Path(config.get("report_output", "data/status.html"))
+        # Fetch recent articles + their observation impacts for dashboard
+        recent_events = _get_recent_events(db_path, limit=10)
+
         render_status(
             system_output=so,
             mc_result=mc_result,
@@ -438,6 +461,7 @@ async def run_pipeline(config: dict) -> dict:
             position_result=result.get("positions"),
             game_signals=result.get("schelling_signals", []),
             mc_n=config.get("mc", {}).get("n", 10000),
+            recent_events=recent_events,
         )
         # Also sync to docs/ for GitHub Pages
         docs_html = Path(config.get("docs_dir", "docs")) / "index.html"
