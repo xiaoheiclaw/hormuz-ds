@@ -331,7 +331,7 @@ img.chart { width: 100%; border-radius: 8px; margin: 8px 0; }
     <tr><th style="width:50%;">文章</th><th>来源</th><th>提取观测</th></tr>
     {% for ev in recent_events %}
     <tr>
-      <td style="color:#e2e8f0;">{{ ev.title[:55] }}{% if ev.title|length > 55 %}…{% endif %}</td>
+      <td style="color:#e2e8f0;" title="{{ ev.title }}">{% if ev.title_zh %}{{ ev.title_zh }}{% else %}{{ ev.title[:55] }}{% if ev.title|length > 55 %}…{% endif %}{% endif %}</td>
       <td style="color:#64748b;font-size:11px;">{{ ev.source[:12] }}</td>
       <td>{% for oid in ev.obs_ids.split(',') %}<span style="background:#1e293b;padding:1px 5px;border-radius:3px;margin-right:2px;font-size:10px;" title="{{ obs_zh.get(oid, oid) }}">{{ oid }}</span>{% endfor %}</td>
     </tr>

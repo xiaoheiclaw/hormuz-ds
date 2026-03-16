@@ -173,7 +173,7 @@ def _get_recent_events(db_path: Path) -> list[dict]:
         return []
     batch = latest[0]
     rows = conn.execute("""
-        SELECT a.title, a.source, GROUP_CONCAT(DISTINCT ao.obs_id) as obs_ids,
+        SELECT a.title, a.title_zh, a.source, GROUP_CONCAT(DISTINCT ao.obs_id) as obs_ids,
                MAX(ao.confidence) as conf
         FROM articles a
         JOIN article_observations ao ON a.id = ao.article_id
@@ -183,7 +183,8 @@ def _get_recent_events(db_path: Path) -> list[dict]:
     """, (batch,)).fetchall()
     conn.close()
     return [
-        {"title": r[0], "source": r[1], "obs_ids": r[2] or "", "confidence": r[3] or ""}
+        {"title": r[0], "title_zh": r[1] or "", "source": r[2],
+         "obs_ids": r[3] or "", "confidence": r[4] or ""}
         for r in rows
     ]
 
@@ -278,6 +279,12 @@ async def run_pipeline(config: dict) -> dict:
             llm_obs = extraction.observations
             llm_signals = extraction.signals
             result["parameter_updates"] = extraction.parameter_updates
+
+            # Inject Chinese titles into parsed articles before storing
+            for a in new_parsed:
+                title = a.get("title", "")
+                if title in extraction.titles_zh:
+                    a["title_zh"] = extraction.titles_zh[title]
 
             # Store articles and provenance
             batch_run = datetime.now().strftime("%Y%m%d-%H%M%S")

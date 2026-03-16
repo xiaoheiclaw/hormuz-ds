@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS parameters_override (
 CREATE TABLE IF NOT EXISTS articles (
     id TEXT PRIMARY KEY,
     title TEXT,
+    title_zh TEXT,
     source TEXT,
     url TEXT,
     summary TEXT,
@@ -407,9 +408,10 @@ def insert_articles(path: Path, articles: list[dict]) -> None:
     """Store articles, skip duplicates by ID (INSERT OR IGNORE)."""
     conn = sqlite3.connect(path)
     conn.executemany(
-        "INSERT OR IGNORE INTO articles (id, title, source, url, summary, published_date) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO articles (id, title, title_zh, source, url, summary, published_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
-            (a["id"], a.get("title", ""), a.get("source", ""), a.get("url", ""),
+            (a["id"], a.get("title", ""), a.get("title_zh", ""),
+             a.get("source", ""), a.get("url", ""),
              a.get("summary", "")[:3000], a.get("published_date"))
             for a in articles if a.get("id")
         ],

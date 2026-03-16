@@ -25,8 +25,11 @@ Return JSON only:
 {{
   "observations": [{{"id": "O01", "value": 0.8, "confidence": "high"}}, ...],
   "signals": [{{"key": "external_mediation", "evidence": "high"}}, ...],
-  "parameter_updates": [{{"param": "sweep_ships", "value": 4, "source": "quoted text or reasoning"}}, ...]
+  "parameter_updates": [{{"param": "sweep_ships", "value": 4, "source": "quoted text or reasoning"}}, ...],
+  "titles_zh": [{{"title": "original English title", "zh": "中文标题（15字以内）"}}, ...]
 }}
+
+titles_zh: translate each article title to concise Chinese (max 15 chars). Include ALL articles in the batch.
 
 ## A-GROUP: Threat Status (feed ACH engine, 0-1 scale)
 ## IMPORTANT: These cover ALL Iran/IRGC/proxy military activity across ALL fronts,
@@ -237,6 +240,7 @@ class ExtractionResult:
     signals: list[SignalEvidence] = field(default_factory=list)
     parameter_updates: list[dict] = field(default_factory=list)
     provenance: list[dict] = field(default_factory=list)
+    titles_zh: dict[str, str] = field(default_factory=dict)
 
 
 async def _extract_batch(
@@ -245,7 +249,7 @@ async def _extract_batch(
     ts: datetime,
     conflict_day: int | None = None,
     previous_obs: dict[str, float] | None = None,
-) -> tuple[list[Observation], list[SignalEvidence], list[dict], list[dict]]:
+) -> tuple[list[Observation], list[SignalEvidence], list[dict], list[dict], dict[str, str]]:
     """Extract observations and signals from a single batch of articles."""
     text_parts = []
     for a in articles:
@@ -298,7 +302,13 @@ async def _extract_batch(
         if isinstance(pu, dict) and pu.get("param") in valid_params:
             param_updates.append(pu)
 
-    return observations, signals, provenance, param_updates
+    # Chinese title translations
+    titles_zh: dict[str, str] = {}
+    for t in result.get("titles_zh", []):
+        if isinstance(t, dict) and t.get("title") and t.get("zh"):
+            titles_zh[t["title"]] = t["zh"]
+
+    return observations, signals, provenance, param_updates, titles_zh
 
 
 async def extract_observations(
@@ -325,13 +335,14 @@ async def extract_observations(
     all_signals: list[SignalEvidence] = []
     all_provenance: list[dict] = []
     all_param_updates: list[dict] = []
+    all_titles_zh: dict[str, str] = {}
     import asyncio as _aio
 
     for i in range(0, len(articles), batch_size):
         batch = articles[i : i + batch_size]
         for attempt in range(3):
             try:
-                batch_obs, batch_sigs, batch_prov, batch_params = await _extract_batch(
+                batch_obs, batch_sigs, batch_prov, batch_params, batch_zh = await _extract_batch(
                     batch, llm, ts,
                     conflict_day=conflict_day,
                     previous_obs=previous_obs,
@@ -340,6 +351,7 @@ async def extract_observations(
                 all_signals.extend(batch_sigs)
                 all_provenance.extend(batch_prov)
                 all_param_updates.extend(batch_params)
+                all_titles_zh.update(batch_zh)
                 break
             except Exception:
                 if attempt < 2:
@@ -373,4 +385,5 @@ async def extract_observations(
         signals=list(best_sigs.values()),
         parameter_updates=list(best_params.values()),
         provenance=all_provenance,
+        titles_zh=all_titles_zh,
     )
