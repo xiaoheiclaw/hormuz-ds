@@ -18,3 +18,6 @@ cd "$PROJECT_DIR"
 echo "=== $(date '+%Y-%m-%d %H:%M:%S') hormuz run ===" >> "${LOG_DIR}/run.log"
 "$VENV_HORMUZ" run >> "${LOG_DIR}/run.log" 2>&1
 echo "=== done ===" >> "${LOG_DIR}/run.log"
+
+# Sync status to octopus (best-effort, don't block on failure)
+"${PROJECT_DIR}/scripts/sync_octopus.sh" >> "${LOG_DIR}/run.log" 2>&1 || true
