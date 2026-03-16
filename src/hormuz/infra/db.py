@@ -101,6 +101,18 @@ CREATE TABLE IF NOT EXISTS article_observations (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS predictions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_ts TEXT NOT NULL,
+    metric TEXT NOT NULL,
+    value REAL NOT NULL,
+    resolve_by TEXT,
+    resolution_criteria TEXT,
+    resolved INTEGER DEFAULT 0,
+    actual REAL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_obs_id_ts ON observations(id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_sysout_created ON system_outputs(created_at);
 """
@@ -464,3 +476,38 @@ def get_article_observations(
         {"article_id": r[0], "obs_id": r[1], "confidence": r[2], "batch_run": r[3], "created_at": r[4]}
         for r in rows
     ]
+
+
+# ── Calibration predictions ──────────────────────────────────────────
+
+def record_predictions(path: Path, so: "SystemOutput", conflict_day: int) -> None:
+    """Record key predictions from a pipeline run for future calibration.
+
+    Tracks: ACH posterior, path probabilities, T expected.
+    Resolution criteria defined per metric for later Brier scoring.
+    """
+    from datetime import timedelta
+    run_ts = so.timestamp.isoformat()
+    resolve_date = (so.timestamp + timedelta(days=30)).strftime("%Y-%m-%d")
+
+    predictions = [
+        ("ach_h2", so.ach_posterior.h2, resolve_date,
+         "H2 correct if conflict still active at T expected date"),
+        ("path_a", so.path_probabilities.a, resolve_date,
+         "Path A correct if conflict resolves within 35 days of start"),
+        ("path_b", so.path_probabilities.b, resolve_date,
+         "Path B correct if conflict resolves between 35-120 days"),
+        ("path_c", so.path_probabilities.c, resolve_date,
+         "Path C correct if conflict exceeds 120 days"),
+        ("t_expected", so.t_weighted_mean, None,
+         "Compare to actual conflict duration when resolved"),
+    ]
+
+    conn = sqlite3.connect(path)
+    conn.executemany(
+        """INSERT INTO predictions (run_ts, metric, value, resolve_by, resolution_criteria)
+           VALUES (?, ?, ?, ?, ?)""",
+        [(run_ts, m, v, rb, rc) for m, v, rb, rc in predictions],
+    )
+    conn.commit()
+    conn.close()

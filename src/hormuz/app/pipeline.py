@@ -400,9 +400,17 @@ async def run_pipeline(config: dict) -> dict:
     # Compute O01 trend from DB history (for T1a/T1b and signal scan)
     o01_trend = compute_o01_trend(db_path)
 
-    # A6/O14 check: H3 unfreeze if external resupply evidence detected
-    # O14 >= 0.7 = strong evidence (satellite/photo or confirmed), triggers H3 unfreeze
-    o14 = next((o for o in all_obs if o.id == "O14" and o.value >= 0.7), None)
+    # A6/O14 check: H3 unfreeze with hysteresis (inspired by GeoPulse regime detection)
+    # Unfreeze requires 2+ consecutive O14 >= 0.7 observations in DB (not single spike)
+    # Refreeze requires O14 dropping below 0.4 (wider gap = hysteresis)
+    all_db_obs = get_observations(db_path)
+    o14_history = [o.value for o in sorted(all_db_obs, key=lambda x: x.timestamp) if o.id == "O14"]
+    if len(o14_history) >= 2 and all(v >= 0.7 for v in o14_history[-2:]):
+        o14 = True  # sustained high → unfreeze
+    elif o14_history and o14_history[-1] < 0.4:
+        o14 = False  # dropped low → refreeze
+    else:
+        o14 = False  # default: stay frozen
 
     # Extract events from observations for M2 duration model.
     # NOTE: O06 and O10 also feed ACH (M1). This is intentional dual use:
@@ -493,9 +501,12 @@ async def run_pipeline(config: dict) -> dict:
         result["errors"].append(f"Step 4 positions: {e}")
         result["steps_completed"] += 1
 
-    # Step 5: DB snapshot
+    # Step 5: DB snapshot + calibration tracking
     try:
         save_system_output(db_path, so)
+        # Record predictions for future calibration (Brier scoring)
+        from hormuz.infra.db import record_predictions
+        record_predictions(db_path, so, conflict_day or 0)
         result["steps_completed"] += 1
     except Exception as e:
         result["errors"].append(f"Step 5 DB: {e}")

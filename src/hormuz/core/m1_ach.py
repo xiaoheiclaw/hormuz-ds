@@ -147,6 +147,30 @@ def get_likelihood_ratio(obs_id: str, value: float, context: dict) -> dict[str, 
     return {"H1": 1.0, "H2": 1.0}
 
 
+_CONFIDENCE_WEIGHTS = {"high": 1.0, "medium": 0.6, "low": 0.3}
+
+
+def _dampen_lr(lr: dict[str, float], confidence: str) -> dict[str, float]:
+    """Dampen LR toward neutral (1.0) based on confidence.
+
+    high=full LR, medium=60% effect, low=30% effect.
+    Low-confidence observations should not move the posterior as much.
+    """
+    w = _CONFIDENCE_WEIGHTS.get(confidence, 0.5)
+    return {k: 1.0 + (v - 1.0) * w for k, v in lr.items()}
+
+
+def _extract_confidence(source: str) -> str:
+    """Extract confidence level from observation source string.
+
+    Handles: 'llm:high', 'ema:llm:medium', 'seed:wikipedia', 'yfinance:bwet_proxy'
+    """
+    for level in ("high", "medium", "low"):
+        if level in source:
+            return level
+    return "high"  # non-LLM sources (seed, yfinance, scraper) get full weight
+
+
 def _compute_log_lr(lr: dict[str, float]) -> float:
     """Compute log(LR_H1 / LR_H2) for a single LR dict."""
     h1 = lr.get("H1", 1.0)
@@ -177,6 +201,8 @@ def _apply_correlation_grouping(
 
     for obs in observations:
         lr = get_likelihood_ratio(obs.id, obs.value, context)
+        conf = _extract_confidence(obs.source)
+        lr = _dampen_lr(lr, conf)
         delta = _compute_log_lr(lr)
         # Check if any hypothesis has non-neutral LR (not just H1/H2)
         has_h3_evidence = any(abs(math.log(v)) > 1e-10 for k, v in lr.items() if k == "H3" and v > 0)
