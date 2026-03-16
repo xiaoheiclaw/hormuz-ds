@@ -373,6 +373,104 @@ def validate(config_path):
             raise SystemExit(1)
 
 
+def _llm_review_day(day: str, runs: list[dict], config: dict) -> str:
+    """Use LLM to assess if observation changes are justified by articles."""
+    import sqlite3
+
+    db_path = Path(config.get("db", {}).get("path", "data/hormuz.db"))
+    conn = sqlite3.connect(db_path)
+
+    # Get all batches for today + their articles and observation impacts
+    rows = conn.execute("""
+        SELECT ao.batch_run, a.title, a.title_zh, ao.obs_id, ao.confidence
+        FROM article_observations ao
+        JOIN articles a ON ao.article_id = a.id
+        WHERE ao.batch_run LIKE ?
+        ORDER BY ao.batch_run, a.rowid
+    """, (day.replace("-", "") + "%",)).fetchall()
+    conn.close()
+
+    if not rows:
+        return "  无文章数据可审查"
+
+    # Group by batch
+    from collections import defaultdict
+    batches: dict[str, list] = defaultdict(list)
+    for batch_run, title, title_zh, obs_id, conf in rows:
+        batches[batch_run].append((title_zh or title, obs_id, conf))
+
+    # Get observation value changes from pipeline log
+    obs_changes = []
+    for i in range(1, len(runs)):
+        prev_ach = runs[i - 1].get("ach", {})
+        curr_ach = runs[i].get("ach", {})
+        h2_prev = prev_ach.get("h2", 0)
+        h2_curr = curr_ach.get("h2", 0)
+        new_articles = runs[i].get("articles_new", 0)
+        if new_articles > 0 and abs(h2_curr - h2_prev) > 0.01:
+            obs_changes.append(
+                f"{runs[i]['ts'][11:16]}: H2 {h2_prev:.0%}→{h2_curr:.0%} ({new_articles}篇新文章)"
+            )
+
+    # Build review prompt
+    batch_text = ""
+    for batch_run, items in batches.items():
+        titles = list({t for t, _, _ in items})[:10]
+        obs_ids = sorted({o for _, o, _ in items})
+        batch_text += f"\nBatch {batch_run}:\n"
+        batch_text += f"  影响观测: {', '.join(obs_ids)}\n"
+        batch_text += f"  文章:\n"
+        for t in titles:
+            batch_text += f"    - {t}\n"
+
+    prompt = f"""你是霍尔木兹危机决策系统的审查员。以下是 {day} 的 pipeline 运行数据。
+
+## 今日概率变动
+{chr(10).join(obs_changes) if obs_changes else "无显著变动"}
+
+## 今日信息源
+{batch_text}
+
+## 任务
+用中文简要评估（3-5句话）：
+1. 今天的文章内容是否支撑观测到的概率变动？
+2. 有没有哪个变动看起来过度反应或反应不足？
+3. 一句话总结今天的信息质量。
+
+注意：不需要重复数字，直接给判断。"""
+
+    # Call LLM
+    llm_config = config.get("llm", {})
+    backend_type = llm_config.get("backend", "claude_api")
+    backend_kwargs = llm_config.get(backend_type, {})
+
+    import httpx
+    headers = {
+        "x-api-key": backend_kwargs.get("api_key", ""),
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    payload = {
+        "model": backend_kwargs.get("model", "claude-sonnet-4-5-20250929"),
+        "max_tokens": 500,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    import time
+    for attempt in range(3):
+        try:
+            resp = httpx.post(
+                f"{backend_kwargs.get('base_url', 'https://api.anthropic.com')}/v1/messages",
+                headers=headers, json=payload,
+                proxy=backend_kwargs.get("proxy"), timeout=60,
+            )
+            resp.raise_for_status()
+            return "  " + resp.json()["content"][0]["text"].replace("\n", "\n  ")
+        except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.TimeoutException):
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+    return "  LLM 审查：3次重试均失败（网络问题）"
+
+
 @cli.command()
 @click.option("--date", "target_date", default=None, help="Date to review (YYYY-MM-DD), default today")
 def review(target_date):
@@ -458,3 +556,12 @@ def review(target_date):
                 click.echo(click.style("  ⚠ ", fg="yellow") + a)
         else:
             click.echo(click.style("\n  ✓ 日内变动正常", fg="green"))
+
+        # LLM review: assess if observation changes are justified by articles
+        if total_new > 0:
+            click.echo(f"\n--- LLM 审查 ---")
+            try:
+                assessment = _llm_review_day(day, runs, _load_config())
+                click.echo(assessment)
+            except Exception as e:
+                click.echo(click.style(f"  LLM 审查失败: {e}", fg="red"))
