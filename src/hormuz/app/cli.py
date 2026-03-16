@@ -371,3 +371,90 @@ def validate(config_path):
             click.echo(click.style("ISSUE", fg="red") + f": {i}")
         if issues:
             raise SystemExit(1)
+
+
+@cli.command()
+@click.option("--date", "target_date", default=None, help="Date to review (YYYY-MM-DD), default today")
+def review(target_date):
+    """Daily review — compare runs, flag anomalies, assess changes."""
+    from datetime import date as _date
+
+    log_path = _project_root() / "data" / "logs" / "pipeline.log"
+    if not log_path.exists():
+        click.echo("No pipeline.log found")
+        return
+
+    day = target_date or _date.today().isoformat()
+    day_prefix = day[5:]  # MM-DD for matching ts field
+
+    # Parse today's runs from log
+    runs = []
+    for line in log_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            d = json.loads(line)
+            if d["ts"].startswith(day):
+                runs.append(d)
+        except (json.JSONDecodeError, KeyError):
+            continue
+
+    if not runs:
+        click.echo(f"No runs found for {day}")
+        return
+
+    click.echo(f"\n{'='*60}")
+    click.echo(f"  Daily Review: {day} ({len(runs)} runs)")
+    click.echo(f"{'='*60}\n")
+
+    # Summary table
+    click.echo(f"{'时间':>12} {'H1':>5} {'H2':>5} {'T期望':>5} {'A':>5} {'B':>5} {'C':>5} {'Gap':>6} {'新文章':>5}")
+    click.echo(f"{'-'*12} {'-'*5} {'-'*5} {'-'*5} {'-'*5} {'-'*5} {'-'*5} {'-'*6} {'-'*5}")
+    for r in runs:
+        ach = r.get("ach", {})
+        paths = r.get("paths", {})
+        ts = r["ts"][11:16]
+        click.echo(
+            f"{ts:>12} "
+            f"{ach.get('h1', 0):>4.0%} "
+            f"{ach.get('h2', 0):>4.0%} "
+            f"{r.get('t_expected', 0):>5.0f} "
+            f"{paths.get('a', 0):>4.0%} "
+            f"{paths.get('b', 0):>4.0%} "
+            f"{paths.get('c', 0):>4.0%} "
+            f"{r.get('gap', 0):>6.0f} "
+            f"{r.get('articles_new', 0):>5}"
+        )
+
+    # Day change analysis
+    if len(runs) >= 2:
+        first, last = runs[0], runs[-1]
+        click.echo(f"\n--- 日内变动 ---")
+        h2_first = first.get("ach", {}).get("h2", 0)
+        h2_last = last.get("ach", {}).get("h2", 0)
+        h2_delta = h2_last - h2_first
+        t_first = first.get("t_expected", 0)
+        t_last = last.get("t_expected", 0)
+        t_delta = t_last - t_first
+        total_new = sum(r.get("articles_new", 0) for r in runs)
+
+        click.echo(f"  H2: {h2_first:.0%} → {h2_last:.0%} ({h2_delta:+.0%})")
+        click.echo(f"  T期望: {t_first:.0f} → {t_last:.0f} ({t_delta:+.0f}天)")
+        click.echo(f"  新文章总计: {total_new}")
+
+        # Anomaly flags
+        anomalies = []
+        if abs(h2_delta) > 0.15:
+            anomalies.append(f"H2 日内波动 {abs(h2_delta):.0%} > 15% — 检查是否有重大新证据")
+        if abs(h2_delta) > 0.05 and total_new == 0:
+            anomalies.append(f"H2 变动 {abs(h2_delta):.0%} 但无新文章 — 可能是 EMA 收敛或数据源变化")
+        errors = [e for r in runs for e in r.get("errors", [])]
+        if errors:
+            anomalies.append(f"有 {len(errors)} 个错误: {errors[0]}")
+
+        if anomalies:
+            click.echo(f"\n--- 异常 ---")
+            for a in anomalies:
+                click.echo(click.style("  ⚠ ", fg="yellow") + a)
+        else:
+            click.echo(click.style("\n  ✓ 日内变动正常", fg="green"))
