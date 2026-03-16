@@ -49,6 +49,14 @@ ROW="| ${TS} | ${DAY} | ${BRENT} | ${H1} | ${H2} | ${T_EXP} | ${P50} | ${PA} | $
 rm -rf "$OCTOPUS_DIR"
 git clone --depth 1 https://github.com/CoinSummer/octopus.git "$OCTOPUS_DIR" 2>/dev/null
 
+# Dedup: skip if last row has same timestamp
+LAST_ROW=$(tail -1 "${OCTOPUS_DIR}/${STATUS_FILE}" 2>/dev/null)
+if echo "$LAST_ROW" | grep -q "| ${TS} |"; then
+    echo "Duplicate timestamp ${TS}, skip"
+    rm -rf "$OCTOPUS_DIR"
+    exit 0
+fi
+
 echo "$ROW" >> "${OCTOPUS_DIR}/${STATUS_FILE}"
 
 cd "$OCTOPUS_DIR"
