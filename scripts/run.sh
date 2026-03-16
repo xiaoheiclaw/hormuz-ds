@@ -19,5 +19,15 @@ echo "=== $(date '+%Y-%m-%d %H:%M:%S') hormuz run ===" >> "${LOG_DIR}/run.log"
 "$VENV_HORMUZ" run >> "${LOG_DIR}/run.log" 2>&1
 echo "=== done ===" >> "${LOG_DIR}/run.log"
 
+# Auto-push dashboard to GitHub Pages (best-effort)
+cd "$PROJECT_DIR"
+if git diff --quiet docs/index.html 2>/dev/null; then
+    echo "Dashboard unchanged, skip push" >> "${LOG_DIR}/run.log"
+else
+    git add docs/index.html data/status.html
+    git commit -m "auto: dashboard $(date '+%m-%d %H:%M')" --no-gpg-sign >> "${LOG_DIR}/run.log" 2>&1
+    git push origin main >> "${LOG_DIR}/run.log" 2>&1 || true
+fi
+
 # Sync status to octopus (best-effort, don't block on failure)
 "${PROJECT_DIR}/scripts/sync_octopus.sh" >> "${LOG_DIR}/run.log" 2>&1 || true
