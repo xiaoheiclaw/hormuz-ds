@@ -54,6 +54,7 @@ echo "$ROW" >> "${OCTOPUS_DIR}/${STATUS_FILE}"
 cd "$OCTOPUS_DIR"
 git add "$STATUS_FILE"
 git commit -m "auto: hormuz status ${TS}" --no-gpg-sign 2>/dev/null || exit 0
+git pull --rebase origin main 2>/dev/null
 git push origin main 2>/dev/null
 
 rm -rf "$OCTOPUS_DIR"
