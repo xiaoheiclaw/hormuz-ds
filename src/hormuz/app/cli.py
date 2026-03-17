@@ -101,77 +101,75 @@ def _write_run_report(result: dict, project_root: Path) -> None:
             f"| T 期望 | {t_prev:.0f} | {t_now:.0f} | {t_now - t_prev:+.0f} 天 |",
         ]
 
-    # Observation value changes (smoothed/EMA values used by ACH)
+    # Observation changes + driving articles (grouped by observation)
     import sqlite3 as _sql
+    from collections import defaultdict as _ddict
     _db = project_root / "data" / "hormuz.db"
+    _obs_zh = {
+        "O01": "攻击频率", "O02": "攻击趋势", "O03": "攻击协调",
+        "O04": "高端武器", "O05": "GPS欺骗", "O06": "网络分布",
+        "O07": "战争险", "O08": "P&I", "O09": "VLCC运费",
+        "O10": "通行量", "O11": "延布装载", "O12": "价差",
+        "O13": "SPR释放", "O14": "外部补给",
+    }
     if _db.exists():
         try:
             _conn = _sql.connect(_db)
-            # Get latest value per O-series (current run's snapshot)
+
+            # 1. Get observation value changes
             _rows = _conn.execute("""
                 SELECT id, value, source FROM observations
                 WHERE id LIKE 'O%' ORDER BY timestamp
             """).fetchall()
-            _conn.close()
-            # Build latest-per-id
             _latest: dict[str, tuple[float, str]] = {}
             _second: dict[str, float] = {}
             for oid, val, src in _rows:
                 if oid in _latest:
                     _second[oid] = _latest[oid][0]
                 _latest[oid] = (val, src)
-            # Show observations that changed
-            _obs_zh = {
-                "O01": "攻击频率", "O02": "攻击趋势", "O03": "攻击协调",
-                "O04": "高端武器", "O05": "GPS欺骗", "O06": "网络分布",
-                "O07": "战争险", "O08": "P&I", "O09": "VLCC运费",
-                "O10": "通行量", "O11": "延布装载", "O12": "价差",
-                "O13": "SPR释放", "O14": "外部补给",
-            }
-            obs_lines = []
+
+            # 2. Get articles grouped by obs_id from latest batch
+            _articles_by_obs: dict[str, list[str]] = _ddict(list)
+            _latest_batch = _conn.execute(
+                "SELECT batch_run FROM article_observations ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+            if _latest_batch:
+                _art_rows = _conn.execute("""
+                    SELECT ao.obs_id, COALESCE(a.title_zh, a.title)
+                    FROM article_observations ao
+                    JOIN articles a ON ao.article_id = a.id
+                    WHERE ao.batch_run = ?
+                """, (_latest_batch[0],)).fetchall()
+                for obs_id, title in _art_rows:
+                    if title and title not in _articles_by_obs[obs_id]:
+                        _articles_by_obs[obs_id].append(title)
+
+            _conn.close()
+
+            # 3. Build combined section: observation change → driving articles
+            has_changes = False
             for oid in sorted(_latest.keys()):
                 val, src = _latest[oid]
                 prev_val = _second.get(oid)
                 if prev_val is not None and abs(val - prev_val) > 0.001:
+                    if not has_changes:
+                        lines += ["", "## 观测变化及驱动事件", ""]
+                        has_changes = True
                     delta = val - prev_val
                     name = _obs_zh.get(oid, oid)
-                    obs_lines.append(f"| {oid} {name} | {prev_val:.2f} | {val:.2f} | {delta:+.2f} |")
-            if obs_lines:
-                lines += [
-                    "", "## 观测变化", "",
-                    "| 观测 | 上次 | 本次 | 变化 |",
-                    "|------|------|------|------|",
-                ] + obs_lines
-        except Exception:
-            pass
+                    lines.append(f"### {oid} {name}: {prev_val:.2f} → {val:.2f} ({delta:+.2f})")
+                    articles = _articles_by_obs.get(oid, [])
+                    if articles:
+                        for a in articles[:5]:
+                            lines.append(f"- {a[:50]}")
+                    elif "ema" in src:
+                        lines.append("- *EMA 平滑收敛（历史值衰减）*")
+                    elif "seed" in src or "computed" in src:
+                        lines.append(f"- *自动计算（{src}）*")
+                    else:
+                        lines.append(f"- *数据源：{src}*")
+                    lines.append("")
 
-    # Articles
-    articles_new = result.get("articles_new", 0)
-    if articles_new > 0:
-        import sqlite3
-        db_path = Path(result.get("db_path", project_root / "data" / "hormuz.db"))
-        if not db_path.exists():
-            db_path = project_root / "data" / "hormuz.db"
-        try:
-            conn = sqlite3.connect(db_path)
-            latest_batch = conn.execute(
-                "SELECT batch_run FROM article_observations ORDER BY created_at DESC LIMIT 1"
-            ).fetchone()
-            if latest_batch:
-                rows = conn.execute("""
-                    SELECT COALESCE(a.title_zh, a.title), GROUP_CONCAT(DISTINCT ao.obs_id)
-                    FROM articles a
-                    JOIN article_observations ao ON a.id = ao.article_id
-                    WHERE ao.batch_run = ?
-                    GROUP BY a.id ORDER BY a.rowid DESC
-                """, (latest_batch[0],)).fetchall()
-                if rows:
-                    lines += ["", "## 本轮信息源", ""]
-                    lines.append("| 文章 | 影响观测 |")
-                    lines.append("|------|---------|")
-                    for title, obs_ids in rows:
-                        lines.append(f"| {title[:40]} | {obs_ids} |")
-            conn.close()
         except Exception:
             pass
 
