@@ -46,6 +46,107 @@ def _write_pipeline_log(result: dict, project_root: Path) -> None:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+def _write_run_report(result: dict, project_root: Path) -> None:
+    """Generate a per-run markdown report in data/reports/."""
+    so = result.get("system_output")
+    if not so:
+        return
+
+    report_dir = project_root / "data" / "reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    ts = so.timestamp.strftime("%Y%m%d-%H%M")
+    report_path = report_dir / f"{ts}.md"
+
+    # Load previous run for comparison
+    log_path = project_root / "data" / "logs" / "pipeline.log"
+    prev = None
+    if log_path.exists():
+        lines = log_path.read_text().splitlines()
+        if len(lines) >= 2:
+            try:
+                prev = json.loads(lines[-2])
+            except (json.JSONDecodeError, IndexError):
+                pass
+
+    # Build report
+    pw = so.path_probabilities
+    lines = [
+        f"# Run Report {so.timestamp.strftime('%Y-%m-%d %H:%M')}",
+        "",
+        f"置信度: {so.confidence_level} | 新文章: {result.get('articles_new', 0)}",
+        "",
+        "## 当前状态",
+        "",
+        f"| 指标 | 值 |",
+        f"|------|-----|",
+        f"| ACH | H1={so.ach_posterior.h1:.0%} H2={so.ach_posterior.h2:.0%} → {so.ach_posterior.dominant} |",
+        f"| T 期望 | {so.t_weighted_mean:.0f} 天 (p50={so.t_total_percentiles.get('p50', 0):.0f}) |",
+        f"| 路径 | A={pw.a:.0%} B={pw.b:.0%} C={pw.c:.0%} |",
+        f"| 总缺口 | {so.expected_total_gap:.0f} mbd·天 |",
+    ]
+
+    # Delta from previous
+    if prev and prev.get("ach"):
+        h2_prev = prev["ach"].get("h2", 0)
+        h2_now = so.ach_posterior.h2
+        t_prev = prev.get("t_expected", 0)
+        t_now = so.t_weighted_mean
+        lines += [
+            "",
+            "## 变动",
+            "",
+            f"| 指标 | 上次 | 本次 | 变化 |",
+            f"|------|------|------|------|",
+            f"| H2 | {h2_prev:.0%} | {h2_now:.0%} | {h2_now - h2_prev:+.0%} |",
+            f"| T 期望 | {t_prev:.0f} | {t_now:.0f} | {t_now - t_prev:+.0f} 天 |",
+        ]
+
+    # Articles
+    articles_new = result.get("articles_new", 0)
+    if articles_new > 0:
+        import sqlite3
+        db_path = Path(result.get("db_path", project_root / "data" / "hormuz.db"))
+        if not db_path.exists():
+            db_path = project_root / "data" / "hormuz.db"
+        try:
+            conn = sqlite3.connect(db_path)
+            latest_batch = conn.execute(
+                "SELECT batch_run FROM article_observations ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+            if latest_batch:
+                rows = conn.execute("""
+                    SELECT COALESCE(a.title_zh, a.title), GROUP_CONCAT(DISTINCT ao.obs_id)
+                    FROM articles a
+                    JOIN article_observations ao ON a.id = ao.article_id
+                    WHERE ao.batch_run = ?
+                    GROUP BY a.id ORDER BY a.rowid DESC
+                """, (latest_batch[0],)).fetchall()
+                if rows:
+                    lines += ["", "## 本轮信息源", ""]
+                    lines.append("| 文章 | 影响观测 |")
+                    lines.append("|------|---------|")
+                    for title, obs_ids in rows:
+                        lines.append(f"| {title[:40]} | {obs_ids} |")
+            conn.close()
+        except Exception:
+            pass
+
+    # Errors
+    errors = result.get("errors", [])
+    if errors:
+        lines += ["", "## 错误", ""]
+        for e in errors:
+            lines.append(f"- {e}")
+
+    # Flags
+    if so.consistency_flags:
+        lines += ["", "## 一致性标记", ""]
+        for f in so.consistency_flags:
+            lines.append(f"- {f}")
+
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _project_root() -> Path:
     """Resolve project root (contains pyproject.toml)."""
     p = Path(__file__).resolve()
@@ -109,6 +210,8 @@ def run(config_path, mc_n, seed):
 
     # Append structured log to data/logs/pipeline.log
     _write_pipeline_log(result, _project_root())
+    # Generate per-run markdown report
+    _write_run_report(result, _project_root())
 
 
 @cli.command()
