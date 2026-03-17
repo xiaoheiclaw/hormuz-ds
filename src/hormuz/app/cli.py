@@ -423,6 +423,18 @@ def _llm_review_day(day: str, runs: list[dict], config: dict) -> str:
         for t in titles:
             batch_text += f"    - {t}\n"
 
+    # Load existing prompt patches
+    patches_path = _project_root() / "data" / "prompt_patches.yaml"
+    patches_text = "无"
+    if patches_path.exists():
+        import yaml as _yaml
+        pdata = _yaml.safe_load(patches_path.read_text()) or {}
+        patches = pdata.get("patches", [])
+        if patches:
+            patches_text = "\n".join(
+                f"- [{p['obs_id']}] {p['rule']}" for p in patches
+            )
+
     prompt = f"""你是霍尔木兹危机决策系统的审查员。以下是 {day} 的 pipeline 运行数据。
 
 ## 今日概率变动
@@ -431,11 +443,30 @@ def _llm_review_day(day: str, runs: list[dict], config: dict) -> str:
 ## 今日信息源
 {batch_text}
 
+## 当前提取规则补丁
+{patches_text}
+
 ## 任务
-用中文简要评估（3-5句话）：
-1. 今天的文章内容是否支撑观测到的概率变动？
-2. 有没有哪个变动看起来过度反应或反应不足？
-3. 一句话总结今天的信息质量。
+用中文评估：
+
+### 1. 变动合理性（2-3句）
+今天的文章内容是否支撑观测到的概率变动？有没有过度反应或反应不足？
+
+### 2. 方法论建议（0-2条）
+如果发现提取规则有系统性问题，给出**方法论层面**的改进建议。格式：
+- `[观测ID] 建议内容`
+
+好的建议示例：
+- `[O04] 需要明确的武器型号/库存变化报道才能变动超过±0.2，攻击目标类型变化不构成充分证据`
+- `[O01] 区分"攻击波次"和"攻击成功数"，前者是意图，后者是能力`
+
+不好的建议（太具体，硬编码个案）：
+- `无人机打机场不算武器降级` ← 这是个案判断，不是方法论
+
+如果今天提取没有系统性问题，写"无建议"。
+
+### 3. 信息质量（1句）
+一句话总结。
 
 注意：不需要重复数字，直接给判断。"""
 

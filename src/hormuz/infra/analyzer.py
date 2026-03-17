@@ -237,10 +237,28 @@ def _build_context(conflict_day: int | None = None, previous_obs: dict[str, floa
     return "\n".join(parts)
 
 
+def _load_prompt_patches() -> str:
+    """Load prompt patches from data/prompt_patches.yaml if available."""
+    from pathlib import Path
+    patches_path = Path("data/prompt_patches.yaml")
+    if not patches_path.exists():
+        return ""
+    import yaml
+    data = yaml.safe_load(patches_path.read_text()) or {}
+    patches = data.get("patches", [])
+    if not patches:
+        return ""
+    lines = ["\n*** EXTRACTION RULES (from review feedback) ***"]
+    for p in patches:
+        lines.append(f"- [{p['obs_id']}] {p['rule']}")
+    return "\n".join(lines)
+
+
 def build_extraction_prompt(conflict_day: int | None = None, previous_obs: dict[str, float] | None = None) -> str:
-    """Build the full extraction prompt with dynamic context."""
+    """Build the full extraction prompt with dynamic context + patches."""
     context = _build_context(conflict_day, previous_obs)
-    return _EXTRACTION_PROMPT_TEMPLATE.format(context=context)
+    patches = _load_prompt_patches()
+    return _EXTRACTION_PROMPT_TEMPLATE.format(context=context) + patches
 
 
 @dataclass
