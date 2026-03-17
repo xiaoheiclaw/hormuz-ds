@@ -38,7 +38,9 @@ Rules:
 - deltas across all articles should roughly sum to the difference from previous values
 - An article with no relevant info for an observation should NOT appear for that obs_id
 - Most articles contribute small deltas (±0.02-0.05). Only major events justify ±0.1+
-- Include ALL articles, even if their impact is small
+- ONLY attribute delta to articles reporting NEW FACTS (attacks, deployments, official statements, data releases)
+- Do NOT attribute delta to analysis/opinion/explainer articles — they analyze existing facts, not create new ones
+- Example: "Iran launches missile at Saudi port" → O01 delta. "Why Iran's drones are hard to intercept" → NO delta (analysis, no new event)
 
 ## A-GROUP: Threat Status (feed ACH engine, 0-1 scale)
 ## IMPORTANT: These cover ALL Iran/IRGC/proxy military activity across ALL fronts,
