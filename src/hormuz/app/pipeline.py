@@ -339,6 +339,20 @@ async def run_pipeline(config: dict) -> dict:
             insert_articles(db_path, new_parsed)
             if extraction.provenance:
                 insert_article_observations(db_path, extraction.provenance, batch_run=batch_run)
+            # Store per-article attribution
+            if extraction.attribution:
+                import sqlite3 as _sql3
+                _conn = _sql3.connect(db_path)
+                _conn.executemany(
+                    "INSERT INTO article_attribution (title, obs_id, delta, batch_run) VALUES (?, ?, ?, ?)",
+                    [
+                        (attr["title"], obs_id, delta, batch_run)
+                        for attr in extraction.attribution
+                        for obs_id, delta in attr["impacts"].items()
+                    ],
+                )
+                _conn.commit()
+                _conn.close()
         else:
             llm_obs = []
 

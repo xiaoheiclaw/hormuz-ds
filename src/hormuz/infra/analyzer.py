@@ -26,10 +26,19 @@ Return JSON only:
   "observations": [{{"id": "O01", "value": 0.8, "confidence": "high"}}, ...],
   "signals": [{{"key": "external_mediation", "evidence": "high"}}, ...],
   "parameter_updates": [{{"param": "sweep_ships", "value": 4, "source": "quoted text or reasoning"}}, ...],
-  "titles_zh": [{{"title": "original English title", "zh": "中文标题（15字以内）"}}, ...]
+  "titles_zh": [{{"title": "original English title", "zh": "中文标题（15字以内）"}}, ...],
+  "attribution": [{{"title": "original English title", "impacts": [{{"obs_id": "O01", "delta": +0.05}}, ...]}}, ...]
 }}
 
 titles_zh: translate each article title to concise Chinese (max 15 chars). Include ALL articles in the batch.
+
+attribution: estimate how much each article INDIVIDUALLY contributed to the observation values.
+Rules:
+- delta is the estimated change this ONE article caused (positive = increase, negative = decrease)
+- deltas across all articles should roughly sum to the difference from previous values
+- An article with no relevant info for an observation should NOT appear for that obs_id
+- Most articles contribute small deltas (±0.02-0.05). Only major events justify ±0.1+
+- Include ALL articles, even if their impact is small
 
 ## A-GROUP: Threat Status (feed ACH engine, 0-1 scale)
 ## IMPORTANT: These cover ALL Iran/IRGC/proxy military activity across ALL fronts,
@@ -269,6 +278,7 @@ class ExtractionResult:
     parameter_updates: list[dict] = field(default_factory=list)
     provenance: list[dict] = field(default_factory=list)
     titles_zh: dict[str, str] = field(default_factory=dict)
+    attribution: list[dict] = field(default_factory=list)
 
 
 async def _extract_batch(
@@ -277,7 +287,7 @@ async def _extract_batch(
     ts: datetime,
     conflict_day: int | None = None,
     previous_obs: dict[str, float] | None = None,
-) -> tuple[list[Observation], list[SignalEvidence], list[dict], list[dict], dict[str, str]]:
+) -> tuple[list[Observation], list[SignalEvidence], list[dict], list[dict], dict[str, str], list[dict]]:
     """Extract observations and signals from a single batch of articles."""
     text_parts = []
     for a in articles:
@@ -336,7 +346,23 @@ async def _extract_batch(
         if isinstance(t, dict) and t.get("title") and t.get("zh"):
             titles_zh[t["title"]] = t["zh"]
 
-    return observations, signals, provenance, param_updates, titles_zh
+    # Per-article attribution
+    attribution: list[dict] = []
+    for attr in result.get("attribution", []):
+        if isinstance(attr, dict) and attr.get("title") and attr.get("impacts"):
+            # Map English title to zh if available
+            title = titles_zh.get(attr["title"], attr["title"])
+            impacts = {}
+            for imp in attr["impacts"]:
+                if isinstance(imp, dict) and imp.get("obs_id") and imp.get("delta") is not None:
+                    try:
+                        impacts[imp["obs_id"]] = float(imp["delta"])
+                    except (TypeError, ValueError):
+                        pass
+            if impacts:
+                attribution.append({"title": title, "impacts": impacts})
+
+    return observations, signals, provenance, param_updates, titles_zh, attribution
 
 
 async def extract_observations(
@@ -364,13 +390,14 @@ async def extract_observations(
     all_provenance: list[dict] = []
     all_param_updates: list[dict] = []
     all_titles_zh: dict[str, str] = {}
+    all_attribution: list[dict] = []
     import asyncio as _aio
 
     for i in range(0, len(articles), batch_size):
         batch = articles[i : i + batch_size]
         for attempt in range(3):
             try:
-                batch_obs, batch_sigs, batch_prov, batch_params, batch_zh = await _extract_batch(
+                batch_obs, batch_sigs, batch_prov, batch_params, batch_zh, batch_attr = await _extract_batch(
                     batch, llm, ts,
                     conflict_day=conflict_day,
                     previous_obs=previous_obs,
@@ -380,6 +407,7 @@ async def extract_observations(
                 all_provenance.extend(batch_prov)
                 all_param_updates.extend(batch_params)
                 all_titles_zh.update(batch_zh)
+                all_attribution.extend(batch_attr)
                 break
             except Exception:
                 if attempt < 2:
@@ -414,4 +442,5 @@ async def extract_observations(
         parameter_updates=list(best_params.values()),
         provenance=all_provenance,
         titles_zh=all_titles_zh,
+        attribution=all_attribution,
     )

@@ -101,6 +101,14 @@ CREATE TABLE IF NOT EXISTS article_observations (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS article_attribution (
+    title TEXT,
+    obs_id TEXT,
+    delta REAL,
+    batch_run TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS predictions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     run_ts TEXT NOT NULL,

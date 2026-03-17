@@ -128,21 +128,34 @@ def _write_run_report(result: dict, project_root: Path) -> None:
                     _second[oid] = _latest[oid][0]
                 _latest[oid] = (val, src)
 
-            # 2. Get articles grouped by obs_id from latest batch
-            _articles_by_obs: dict[str, list[str]] = _ddict(list)
+            # 2. Get per-article attribution from latest batch
+            _attr_by_obs: dict[str, list[tuple[str, float]]] = _ddict(list)
             _latest_batch = _conn.execute(
-                "SELECT batch_run FROM article_observations ORDER BY created_at DESC LIMIT 1"
+                "SELECT batch_run FROM article_attribution ORDER BY created_at DESC LIMIT 1"
             ).fetchone()
             if _latest_batch:
-                _art_rows = _conn.execute("""
-                    SELECT ao.obs_id, COALESCE(a.title_zh, a.title)
-                    FROM article_observations ao
-                    JOIN articles a ON ao.article_id = a.id
-                    WHERE ao.batch_run = ?
+                _attr_rows = _conn.execute("""
+                    SELECT obs_id, title, delta FROM article_attribution
+                    WHERE batch_run = ? ORDER BY ABS(delta) DESC
                 """, (_latest_batch[0],)).fetchall()
-                for obs_id, title in _art_rows:
-                    if title and title not in _articles_by_obs[obs_id]:
-                        _articles_by_obs[obs_id].append(title)
+                for obs_id, title, delta in _attr_rows:
+                    if title:
+                        _attr_by_obs[obs_id].append((title, delta))
+            # Fallback: if no attribution table yet, use article_observations
+            if not _attr_by_obs:
+                _latest_batch2 = _conn.execute(
+                    "SELECT batch_run FROM article_observations ORDER BY created_at DESC LIMIT 1"
+                ).fetchone()
+                if _latest_batch2:
+                    _art_rows = _conn.execute("""
+                        SELECT ao.obs_id, COALESCE(a.title_zh, a.title)
+                        FROM article_observations ao
+                        JOIN articles a ON ao.article_id = a.id
+                        WHERE ao.batch_run = ?
+                    """, (_latest_batch2[0],)).fetchall()
+                    for obs_id, title in _art_rows:
+                        if title:
+                            _attr_by_obs[obs_id].append((title, 0.0))
 
             _conn.close()
 
@@ -159,9 +172,13 @@ def _write_run_report(result: dict, project_root: Path) -> None:
                     name = _obs_zh.get(oid, oid)
                     lines.append(f"### {oid} {name}: {prev_val:.2f} → {val:.2f} ({delta:+.2f})")
                     articles = _articles_by_obs.get(oid, [])
-                    if articles:
-                        for a in articles[:5]:
-                            lines.append(f"- {a[:50]}")
+                    attr_items = _attr_by_obs.get(oid, [])
+                    if attr_items:
+                        for title, d in attr_items[:5]:
+                            if d != 0.0:
+                                lines.append(f"- {title[:45]} **{d:+.2f}**")
+                            else:
+                                lines.append(f"- {title[:50]}")
                     elif "ema" in src:
                         lines.append("- *EMA 平滑收敛（历史值衰减）*")
                     elif "seed" in src or "computed" in src:
