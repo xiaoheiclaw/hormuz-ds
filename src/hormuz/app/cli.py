@@ -101,6 +101,50 @@ def _write_run_report(result: dict, project_root: Path) -> None:
             f"| T 期望 | {t_prev:.0f} | {t_now:.0f} | {t_now - t_prev:+.0f} 天 |",
         ]
 
+    # Observation value changes (smoothed/EMA values used by ACH)
+    import sqlite3 as _sql
+    _db = project_root / "data" / "hormuz.db"
+    if _db.exists():
+        try:
+            _conn = _sql.connect(_db)
+            # Get latest value per O-series (current run's snapshot)
+            _rows = _conn.execute("""
+                SELECT id, value, source FROM observations
+                WHERE id LIKE 'O%' ORDER BY timestamp
+            """).fetchall()
+            _conn.close()
+            # Build latest-per-id
+            _latest: dict[str, tuple[float, str]] = {}
+            _second: dict[str, float] = {}
+            for oid, val, src in _rows:
+                if oid in _latest:
+                    _second[oid] = _latest[oid][0]
+                _latest[oid] = (val, src)
+            # Show observations that changed
+            _obs_zh = {
+                "O01": "攻击频率", "O02": "攻击趋势", "O03": "攻击协调",
+                "O04": "高端武器", "O05": "GPS欺骗", "O06": "网络分布",
+                "O07": "战争险", "O08": "P&I", "O09": "VLCC运费",
+                "O10": "通行量", "O11": "延布装载", "O12": "价差",
+                "O13": "SPR释放", "O14": "外部补给",
+            }
+            obs_lines = []
+            for oid in sorted(_latest.keys()):
+                val, src = _latest[oid]
+                prev_val = _second.get(oid)
+                if prev_val is not None and abs(val - prev_val) > 0.001:
+                    delta = val - prev_val
+                    name = _obs_zh.get(oid, oid)
+                    obs_lines.append(f"| {oid} {name} | {prev_val:.2f} | {val:.2f} | {delta:+.2f} |")
+            if obs_lines:
+                lines += [
+                    "", "## 观测变化", "",
+                    "| 观测 | 上次 | 本次 | 变化 |",
+                    "|------|------|------|------|",
+                ] + obs_lines
+        except Exception:
+            pass
+
     # Articles
     articles_new = result.get("articles_new", 0)
     if articles_new > 0:
