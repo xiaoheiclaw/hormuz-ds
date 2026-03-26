@@ -1,0 +1,39 @@
+# Prompt 变更记录 — 用于 review 评估历史修改效果
+# 每次修改 extraction prompt 时记录
+
+changes:
+  - date: "2026-03-16"
+    type: "新增"
+    description: "O01 交叉信源校准 — PressTV/Alma/CENTCOM 三角验证，重趋势轻绝对值"
+    reason: "O01 被单一信源锚定，不同来源的攻击波次数差异巨大"
+    expected_effect: "O01 不再因单一信源夸大而跳变"
+
+  - date: "2026-03-16"
+    type: "新增"
+    description: "稳定性规则 — ±0.1 正常，±0.2 需明确证据，±0.3+ 需强证据"
+    reason: "O04 从 0.75 跳到 0.4 无强证据支撑"
+    expected_effect: "单次提取波动减少，需要持续证据才能大幅移动"
+
+  - date: "2026-03-17"
+    type: "新增"
+    description: "4 条 prompt patches（溢出效应/外交饱和/交战数据/忽略无关）"
+    reason: "review 发现外交新闻推动能力类观测、无关文章混入"
+    expected_effect: "外交/溢出类文章不再影响 O01-O06"
+
+  - date: "2026-03-17"
+    type: "新增"
+    description: "EMA 平滑 α=0.4"
+    reason: "O04 单次跳变导致 H1 从 15% 到 38%"
+    expected_effect: "单次噪声被平滑，但可能压制真信号"
+
+  - date: "2026-03-26"
+    type: "重构"
+    description: "信息分类框架（Type A-E）替代 4 条 patches"
+    reason: "patches 越积越多，逐条打补丁不可持续"
+    expected_effect: "LLM 先分类再提取，从源头控制信息类型→观测映射"
+
+  - date: "2026-03-26"
+    type: "删除"
+    description: "移除 EMA 平滑"
+    reason: "与分类框架+稳定性规则冲突 — 真信号（伊朗击落F-35）被历史惯性吃掉"
+    expected_effect: "系统对重大事件反应更灵敏，噪声由框架+稳定性规则控制"
