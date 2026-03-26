@@ -195,52 +195,19 @@ def _filter_relevant_articles(articles: list[dict]) -> list[dict]:
     return relevant
 
 
-def _smooth_observations(db_path: Path, alpha: float = 0.4) -> list[Observation]:
-    """Build smoothed observation snapshot for ACH — EMA per O-series.
+def _latest_observations(db_path: Path) -> list[Observation]:
+    """Get latest observation per O-series from DB. No smoothing.
 
-    alpha=0.4: new value gets 40% weight, history gets 60%. This damps
-    single-run LLM noise while still responding to genuine shifts within
-    2-3 runs. Non-LLM sources (yfinance, scraper) use latest raw value.
-
-    Returns one Observation per O-series ID.
+    Noise control is handled upstream by:
+    1. Information Classification Framework (Type A-E) in extraction prompt
+    2. Stability rule (±0.1 normal, ±0.3 needs strong evidence)
+    3. Confidence → LR dampening in ACH engine
     """
-    from collections import defaultdict
     db_obs = get_observations(db_path)
-
-    # Group by ID, sorted by time
-    by_id: dict[str, list[Observation]] = defaultdict(list)
+    latest_by_id: dict[str, Observation] = {}
     for o in sorted(db_obs, key=lambda x: x.timestamp):
-        by_id[o.id].append(o)
-
-    # Non-LLM sources: take latest raw value (already reliable)
-    _RAW_SOURCES = {"yfinance", "shipandbunker", "eia", "db:computed", "seed"}
-
-    result: list[Observation] = []
-    for obs_id, obs_list in by_id.items():
-        latest = obs_list[-1]
-        # Skip smoothing for non-LLM sources
-        if any(s in latest.source for s in _RAW_SOURCES):
-            result.append(latest)
-            continue
-
-        # EMA over LLM-extracted values
-        if len(obs_list) == 1:
-            result.append(latest)
-            continue
-
-        ema = obs_list[0].value
-        for o in obs_list[1:]:
-            ema = alpha * o.value + (1 - alpha) * ema
-
-        result.append(Observation(
-            id=obs_id,
-            timestamp=latest.timestamp,
-            value=round(ema, 3),
-            source=f"ema:{latest.source}",
-            noise_note=f"raw={latest.value:.2f} ema(α={alpha})={ema:.3f}",
-        ))
-
-    return result
+        latest_by_id[o.id] = o
+    return list(latest_by_id.values())
 
 
 def _get_recent_events(db_path: Path) -> list[dict]:
@@ -505,7 +472,7 @@ async def run_pipeline(config: dict) -> dict:
         confidence = compute_confidence_level(db_path)
         # ACH uses smoothed DB observations — EMA of recent values per O-series
         # to reduce single-run LLM extraction noise. Idempotent: same DB → same result.
-        ach_obs = _smooth_observations(db_path)
+        ach_obs = _latest_observations(db_path)
         so, mc_result = engine_run(
             constants, params, ach_obs, controls, events=events,
             mc_n=config.get("mc", {}).get("n", 10000),
