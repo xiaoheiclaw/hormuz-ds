@@ -160,6 +160,41 @@ def _check_consistency(
     return flags
 
 
+_RELEVANCE_KEYWORDS = {
+    # Military / conflict
+    "iran", "irgc", "hormuz", "strait", "gulf", "persian",
+    "strike", "attack", "missile", "drone", "bomb", "war",
+    "military", "naval", "navy", "centcom", "epic fury",
+    "mine", "minesweep", "mcm", "blockade", "convoy", "escort",
+    # Energy / shipping
+    "oil", "crude", "brent", "opec", "tanker", "vlcc", "shipping",
+    "lng", "pipeline", "refinery", "spr", "strategic petroleum",
+    "fuel", "energy", "barrel", "fujairah", "ras tanura",
+    # Insurance / market
+    "insurance", "war risk", "p&i", "lloyd", "freight",
+    # Geopolitical actors
+    "saudi", "uae", "bahrain", "qatar", "kuwait", "oman",
+    "israel", "hezbollah", "houthi", "iraq", "trump", "pentagon",
+    "china", "mediat", "ceasefire", "negotiat", "sanction",
+    # Key infrastructure
+    "port", "terminal", "airport", "base", "nuclear",
+}
+
+
+def _filter_relevant_articles(articles: list[dict]) -> list[dict]:
+    """Drop articles with no connection to the Hormuz crisis.
+
+    Checks title + summary for crisis-related keywords. Articles matching
+    zero keywords are dropped (e.g., sports, entertainment, unrelated regions).
+    """
+    relevant = []
+    for a in articles:
+        text = (a.get("title", "") + " " + a.get("summary", "")[:500]).lower()
+        if any(kw in text for kw in _RELEVANCE_KEYWORDS):
+            relevant.append(a)
+    return relevant
+
+
 def _smooth_observations(db_path: Path, alpha: float = 0.4) -> list[Observation]:
     """Build smoothed observation snapshot for ACH — EMA per O-series.
 
@@ -317,6 +352,11 @@ async def run_pipeline(config: dict) -> dict:
         candidate_ids = {a["id"] for a in parsed if a.get("id")}
         existing_ids = get_article_ids(db_path, candidate_ids) if candidate_ids else set()
         new_parsed = [a for a in parsed if a.get("id") not in existing_ids]
+
+        # Relevance filter: drop articles with no connection to the crisis
+        pre_filter = len(new_parsed)
+        new_parsed = _filter_relevant_articles(new_parsed)
+        result["articles_filtered"] = pre_filter - len(new_parsed)
 
         if new_parsed:
             extraction = await extract_observations(

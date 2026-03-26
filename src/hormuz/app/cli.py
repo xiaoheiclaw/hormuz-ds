@@ -23,6 +23,7 @@ def _write_pipeline_log(result: dict, project_root: Path) -> None:
         "errors": result.get("errors", []),
         "articles_total": result.get("articles_total"),
         "articles_new": result.get("articles_new"),
+        "articles_filtered": result.get("articles_filtered", 0),
     }
     so = result.get("system_output")
     if so:
