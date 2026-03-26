@@ -211,24 +211,64 @@ sweep_ships — Number of MCM (mine countermeasure) vessels deployed to Gulf/Hor
   "mine countermeasure vessels", "USS Avenger-class deployed", "Royal Navy Hunt-class",
   "coalition mine clearance task force of X ships", "MCM force reduced to X vessels"
 
-## RULES
-- Extract observations you can infer from the articles. Reasonable inference is OK — do not require exact quotes.
-- If articles describe active conflict but don't give exact attack counts, estimate based on intensity described (e.g., "heavy fighting" → O01 ≈ 0.7-0.8).
-- If articles don't mention a specific observation AT ALL, OMIT it from the output (don't guess 0).
-- Give confidence: "high" (explicit numbers/quotes), "medium" (reasonable inference), "low" (vague mention).
+## INFORMATION CLASSIFICATION FRAMEWORK (CRITICAL)
+
+Before extracting, classify EACH article into one of five types. The type determines
+which observations it can influence and by how much.
+
+TYPE A — Direct Military Reporting (交战报道)
+  Examples: CENTCOM battle damage assessment, attack wave counts, weapon type identification,
+  force deployment/withdrawal, interception rates, specific casualty/equipment loss numbers.
+  → Can move: O01-O06, O14
+  → Max delta from previous: ±0.15 per article
+  → Confidence: usually "high" (specific data) or "medium" (named source, no exact numbers)
+
+TYPE B — Market / Shipping Data (市场/航运数据)
+  Examples: insurance premium changes, freight rate data, transit counts, SPR releases,
+  refinery throughput, port loading volumes, commodity price moves with specific numbers.
+  → Can move: O07-O13
+  → Max delta from previous: ±0.20 per article (market data can shift fast)
+  → Confidence: "high" if specific numbers, "medium" if directional
+
+TYPE C — Diplomatic / Political (外交/政治)
+  Examples: negotiations, UN statements, ceasefire proposals, demands, condemnations,
+  third-country positions, sanctions, mediator engagement.
+  → Can move: Schelling signals ONLY (external_mediation, us_inconsistency, etc.)
+  → CANNOT move O01-O14. Diplomatic statements don't change physical reality.
+  → Exception: Official force deployment orders (e.g., "Pentagon orders carrier withdrawal") are TYPE A, not C.
+
+TYPE D — Economic Spillover (经济溢出)
+  Examples: economic impact on third countries, airline disruptions, energy price effects
+  on consumers, supply chain disruption stories, recession fears.
+  → Can move: O07-O09 only, max ±0.05 (lagging, indirect)
+  → CANNOT move O01-O06. Economic consequences don't change military capability.
+
+TYPE E — Irrelevant (无关)
+  Examples: sports, entertainment, unrelated regional conflicts, historical analysis,
+  opinion pieces without new facts, think tank general commentary.
+  → CANNOT move any observation. Skip entirely.
+
+## EXTRACTION RULES
+- Classify each article FIRST, then extract based on classification.
+- If an article doesn't mention a specific observation AT ALL, OMIT it (don't guess 0).
+- Confidence: "high" (explicit numbers/quotes), "medium" (reasonable inference), "low" (vague).
 - O01-O06, O08, O10, O11, O14: stay within [0, 1].
 - O07: percentage points. O09: WS points. O12: $/mt. O13: mbd.
-- signals: array of objects with "key" and "evidence" (high/medium/low). Empty array if no signals detected. Most days will be empty.
+- Signals: empty array most days. Only fire on clear diplomatic/strategic events.
 
-*** STABILITY RULE (CRITICAL) ***
-Previous values are provided as baseline. Your output should be CONTINUOUS with them:
-- A shift of ±0.1 from previous is NORMAL (new articles add marginal info).
-- A shift of ±0.2 requires CLEAR evidence in the articles (e.g., a specific event reported).
-- A shift of ±0.3+ requires STRONG, EXPLICIT evidence (confirmed event, named source, specific numbers).
-- If articles don't contain clear evidence for a large shift, KEEP the previous value ±0.1.
-Example: Previous O04=0.75. Articles mention "drone attack on Dubai airport" but no analysis of
-IRGC weapon mix changing → O04 stays 0.7-0.8, NOT 0.4. Only explicit reporting like "IRGC has
-exhausted its ballistic missile stocks and switched to cheap drones" justifies O04=0.3-0.4.
+## STABILITY
+Previous values are the baseline. Output must be CONTINUOUS:
+- ±0.1 = normal (marginal new info)
+- ±0.2 = needs CLEAR evidence (specific reported event)
+- ±0.3+ = needs STRONG EXPLICIT evidence (confirmed, named source, specific numbers)
+- No evidence for large shift → KEEP previous value ±0.1
+
+## KEY ANTI-PATTERNS (do NOT do these)
+- Diplomatic posturing ("demands unconditional surrender") moving O01-O06 → WRONG, that's Type C
+- Single carrier maintenance/rotation moving H2 by >2% → WRONG, routine operational cycle
+- Analysis articles ("why drones are hard to intercept") changing O04 → WRONG, that's Type E
+- Multiple articles about same event amplifying delta → WRONG, one event = one delta regardless of article count
+- Third-country reactions (protests, sanctions) moving capability obs → WRONG, that's Type D at most
 """
 
 
