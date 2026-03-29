@@ -14,7 +14,7 @@ physical:
     # v5.4.1: H3 UNFROZEN 2026-03-29 — Russia/China active material resupply
     # via overland + maritime routes (Atlantic Council, ISW reports March 25-28)
     h3_suspended: false
-    h3_prior: 0.10  # H3 = external resupply hypothesis
+    h3_prior: 0.05  # H3 = external resupply; conservative start pending hard evidence
 
   q2:
     mine_initial_stock: [2000, 6000]
