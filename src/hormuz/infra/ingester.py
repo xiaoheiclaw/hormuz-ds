@@ -45,6 +45,34 @@ async def fetch_readwise_articles(
     cursor: str | None = None
 
     import asyncio as _aio
+    import logging
+
+    _log = logging.getLogger("hormuz.ingester")
+    _MAX_RETRIES = 5
+
+    async def _fetch_with_fallback(client, url, headers, params, proxy_url):
+        """Try proxy first, then direct on persistent failure."""
+        last_exc = None
+        for attempt in range(_MAX_RETRIES):
+            try:
+                resp = await client.get(url, headers=headers, params=params)
+                return resp
+            except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError) as e:
+                last_exc = e
+                _log.warning(f"Readwise fetch attempt {attempt+1}/{_MAX_RETRIES} failed: {e}")
+                if attempt < _MAX_RETRIES - 1:
+                    await _aio.sleep(min(2 ** attempt, 16))
+        # Fallback: try direct (no proxy) if proxy was configured
+        if proxy_url:
+            _log.warning("Proxy retries exhausted, trying direct connection...")
+            async with httpx.AsyncClient(timeout=timeout) as direct:
+                try:
+                    resp = await direct.get(url, headers=headers, params=params)
+                    _log.info("Direct connection succeeded (proxy bypass)")
+                    return resp
+                except Exception as e2:
+                    _log.error(f"Direct fallback also failed: {e2}")
+        raise last_exc
 
     async with httpx.AsyncClient(proxy=proxy, timeout=timeout) as client:
         while len(all_docs) < limit:
@@ -58,19 +86,13 @@ async def fetch_readwise_articles(
             if cursor:
                 params["pageCursor"] = cursor
 
-            # Retry on connection errors (proxy/relay disconnects)
-            for attempt in range(3):
-                try:
-                    resp = await client.get(
-                        "https://readwise.io/api/v3/list/",
-                        headers=headers,
-                        params=params,
-                    )
-                    break
-                except (httpx.RemoteProtocolError, httpx.ConnectError):
-                    if attempt == 2:
-                        raise
-                    await _aio.sleep(2 ** attempt)
+            resp = await _fetch_with_fallback(
+                client,
+                "https://readwise.io/api/v3/list/",
+                headers,
+                params,
+                proxy,
+            )
 
             if resp.status_code == 429:
                 wait = int(resp.headers.get("Retry-After", "60"))
@@ -244,8 +266,11 @@ async def fetch_bunker_spread(
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
+    import logging
+    _log_bunker = logging.getLogger("hormuz.ingester")
+
     for port, url in _BUNKER_URLS.items():
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 async with httpx.AsyncClient(
                     proxy=proxy, timeout=timeout, follow_redirects=True,
@@ -262,9 +287,10 @@ async def fetch_bunker_spread(
                     inner = re.sub(r"<[^>]+>", "", tds[0]).strip()
                     prices[port] = float(inner.replace(",", ""))
                 break
-            except (httpx.RemoteProtocolError, httpx.ConnectError):
-                if attempt < 2:
-                    await _aio.sleep(2 ** attempt)
+            except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError):
+                _log_bunker.warning(f"Bunker {port} attempt {attempt+1}/5 failed")
+                if attempt < 4:
+                    await _aio.sleep(min(2 ** attempt, 16))
             except Exception:
                 break
 
