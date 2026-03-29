@@ -10,9 +10,11 @@ physical:
   q1:
     irgc_decay_mean_weeks: 6.0
     attack_threshold_per_day: 2.0
-    # v5.4: H3 suspended (Mehrabad airport destroyed, supply cut)
-    h3_suspended: true
-    h3_prior: 0.10  # redistributed +5% to H1, +5% to H2 when suspended
+    # v5.4: H3 was suspended (Mehrabad airport destroyed)
+    # v5.4.1: H3 UNFROZEN 2026-03-29 — Russia/China active material resupply
+    # via overland + maritime routes (Atlantic Council, ISW reports March 25-28)
+    h3_suspended: false
+    h3_prior: 0.10  # H3 = external resupply hypothesis
 
   q2:
     mine_initial_stock: [2000, 6000]

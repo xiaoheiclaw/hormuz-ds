@@ -1,0 +1,16 @@
+{
+  "site": "criticalthreats",
+  "target_url": "https://www.criticalthreats.org/analysis",
+  "final_url": "https://www.criticalthreats.org/analysis",
+  "title": "Analysis | Critical Threats",
+  "framework": {
+    "vue3": false,
+    "vue2": false,
+    "react": false,
+    "nextjs": false,
+    "nuxt": false
+  },
+  "stores": [],
+  "top_strategy": "public",
+  "explored_at": "2026-03-16T10:07:08.382Z"
+}

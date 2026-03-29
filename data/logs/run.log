@@ -1,0 +1,578 @@
+=== 2026-03-15 20:00:01 hormuz run ===
+Pipeline completed: 3/6 steps
+  ⚠ Step 3 engine: run_ach() got an unexpected keyword argument 'prior_log_odds'
+=== done ===
+=== 2026-03-16 08:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.15 H2=0.73
+  Paths: A=5% B=75% C=20%
+=== done ===
+=== 2026-03-16 12:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.38 H2=0.62
+  Paths: A=5% B=83% C=11%
+=== done ===
+[main 965c3b9] auto: hormuz status 03-16 12:03:55
+ 1 file changed, 1 insertion(+)
+Current branch main is up to date.
+Octopus STATUS.md updated: 03-16 12:03:55
+=== 2026-03-16 16:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.14 H2=0.86
+  Paths: A=6% B=82% C=12%
+=== done ===
+[main fb9bd58] auto: dashboard 03-16 16:01
+ 2 files changed, 72 insertions(+), 1038 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   8f698a5..fb9bd58  main -> main
+[main 634bdb5] auto: hormuz status 03-16 16:01:35
+ 1 file changed, 1 insertion(+)
+Current branch main is up to date.
+Octopus STATUS.md updated: 03-16 16:01:35
+=== 2026-03-16 20:00:02 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.14 H2=0.86
+  Paths: A=2% B=83% C=15%
+=== done ===
+[main 693fe6e] auto: dashboard 03-16 20:01
+ 2 files changed, 174 insertions(+), 90 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   fb9bd58..693fe6e  main -> main
+[main c7579d8] auto: hormuz status 03-16 20:01:41
+ 1 file changed, 1 insertion(+)
+Current branch main is up to date.
+Octopus STATUS.md updated: 03-16 20:01:41
+=== 2026-03-17 08:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.18 H2=0.82
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main c671b8b] auto: dashboard 03-17 08:10
+ 2 files changed, 1006 insertions(+), 88 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   fe65c7f..c671b8b  main -> main
+[main 28c4e48] auto: hormuz status 03-17 08:10:49
+ 1 file changed, 1 insertion(+)
+Current branch main is up to date.
+Octopus STATUS.md updated: 03-17 08:10:49
+=== 2026-03-17 12:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=7% B=80% C=13%
+=== done ===
+[main f60cb50] auto: dashboard 03-17 12:01
+ 2 files changed, 124 insertions(+), 944 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   d711e71..f60cb50  main -> main
+[main fc24ed3] auto: hormuz status 03-17 12:01:45
+ 1 file changed, 1 insertion(+)
+Current branch main is up to date.
+Octopus STATUS.md updated: 03-17 12:01:45
+=== 2026-03-17 16:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.13 H2=0.87
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main 85baa9a] auto: dashboard 03-17 16:05
+ 2 files changed, 590 insertions(+), 134 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   f60cb50..85baa9a  main -> main
+=== 2026-03-17 20:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.21 H2=0.79
+  Paths: A=3% B=84% C=13%
+=== done ===
+[main feec733] auto: dashboard 03-17 20:01
+ 2 files changed, 102 insertions(+), 596 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   85baa9a..feec733  main -> main
+=== 2026-03-18 08:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=5% B=82% C=13%
+=== done ===
+[main 6b2c1cb] auto: dashboard 03-18 08:06
+ 2 files changed, 784 insertions(+), 90 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   feec733..6b2c1cb  main -> main
+=== 2026-03-18 12:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  ⚠ Step 1 fetch: Failed to perform, curl: (56) Connection closed abruptly. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=6% B=82% C=12%
+=== done ===
+[main b1e7ea4] auto: dashboard 03-18 12:01
+ 2 files changed, 48 insertions(+), 118 deletions(-)
+fatal: unable to access 'https://github.com/xiaoheiclaw/hormuz-ds.git/': LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to github.com:443 
+=== 2026-03-18 16:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=5% B=83% C=12%
+=== done ===
+[main afabf62] auto: dashboard 03-18 16:04
+ 2 files changed, 300 insertions(+), 486 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   6b2c1cb..afabf62  main -> main
+=== 2026-03-18 20:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=5% B=83% C=12%
+=== done ===
+[main 6a261c3] auto: dashboard 03-18 20:02
+ 2 files changed, 112 insertions(+), 408 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   afabf62..6a261c3  main -> main
+=== 2026-03-19 08:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=7% B=81% C=12%
+=== done ===
+[main 493681a] auto: dashboard 03-19 08:10
+ 2 files changed, 48 insertions(+), 70 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   6a261c3..493681a  main -> main
+=== 2026-03-19 12:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.16 H2=0.84
+  Paths: A=6% B=80% C=14%
+=== done ===
+[main 08b86ab] auto: dashboard 03-19 12:01
+ 2 files changed, 108 insertions(+), 266 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   493681a..08b86ab  main -> main
+=== 2026-03-19 16:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.13 H2=0.87
+  Paths: A=5% B=80% C=15%
+=== done ===
+[main ca96393] auto: dashboard 03-19 16:03
+ 2 files changed, 206 insertions(+), 62 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   08b86ab..ca96393  main -> main
+=== 2026-03-19 20:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.13 H2=0.87
+  Paths: A=5% B=82% C=13%
+=== done ===
+[main 020cbc6] auto: dashboard 03-19 20:03
+ 2 files changed, 248 insertions(+), 120 deletions(-)
+fatal: unable to access 'https://github.com/xiaoheiclaw/hormuz-ds.git/': transfer closed with outstanding read data remaining
+=== 2026-03-20 08:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.13 H2=0.87
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main 8d97f2b] auto: dashboard 03-20 08:09
+ 2 files changed, 988 insertions(+), 180 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   ca96393..8d97f2b  main -> main
+=== 2026-03-20 12:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.13 H2=0.87
+  Paths: A=5% B=80% C=15%
+=== done ===
+[main ff64887] auto: dashboard 03-20 12:02
+ 2 files changed, 70 insertions(+), 1102 deletions(-)
+error: RPC failed; curl 52 Empty reply from server
+send-pack: unexpected disconnect while reading sideband packet
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+=== 2026-03-20 16:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=5% B=80% C=15%
+=== done ===
+[main 48ca20a] auto: dashboard 03-20 16:03
+ 2 files changed, 162 insertions(+), 86 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   ff64887..48ca20a  main -> main
+=== 2026-03-20 20:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.13 H2=0.87
+  Paths: A=5% B=80% C=15%
+=== done ===
+[main aaf8227] auto: dashboard 03-20 20:05
+ 2 files changed, 376 insertions(+), 120 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+ ! [remote rejected] main -> main (cannot lock ref 'refs/heads/main': is at aaf822763618c7afd7c4e495cf29fd69ed2b467b but expected 48ca20a3680458cf79e0a876b30b1649740dbcc6)
+error: failed to push some refs to 'https://github.com/xiaoheiclaw/hormuz-ds.git'
+=== 2026-03-21 08:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.13 H2=0.87
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main 4bc94c7] auto: dashboard 03-21 08:08
+ 2 files changed, 710 insertions(+), 194 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+ ! [remote rejected] main -> main (cannot lock ref 'refs/heads/main': is at 4bc94c74a912558b9037b93a3f1e079578f1b2cd but expected aaf822763618c7afd7c4e495cf29fd69ed2b467b)
+error: failed to push some refs to 'https://github.com/xiaoheiclaw/hormuz-ds.git'
+=== 2026-03-21 12:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.11 H2=0.89
+  Paths: A=4% B=83% C=14%
+=== done ===
+[main bfeeb1c] auto: dashboard 03-21 12:01
+ 2 files changed, 58 insertions(+), 112 deletions(-)
+fatal: unable to access 'https://github.com/xiaoheiclaw/hormuz-ds.git/': Empty reply from server
+=== 2026-03-21 16:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.11 H2=0.89
+  Paths: A=4% B=83% C=14%
+=== done ===
+[main 83dbb64] auto: dashboard 03-21 16:02
+ 2 files changed, 12 insertions(+), 924 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   4bc94c7..83dbb64  main -> main
+=== 2026-03-21 20:00:02 hormuz run ===
+Pipeline completed: 6/6 steps
+  ⚠ Step 1 fetch: Failed to perform, curl: (35) TLS connect error: error:00000000:invalid library (0):OPENSSL_internal:invalid library (0). See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  GrossGap: 16.1 mbd
+  ACH: H1=0.11 H2=0.89
+  Paths: A=4% B=83% C=14%
+=== done ===
+[main a2980aa] auto: dashboard 03-21 20:01
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+fatal: unable to access 'https://github.com/xiaoheiclaw/hormuz-ds.git/': LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to github.com:443 
+=== 2026-03-22 08:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.09 H2=0.91
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main a446b3e] auto: dashboard 03-22 08:05
+ 2 files changed, 838 insertions(+), 52 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   83dbb64..a446b3e  main -> main
+=== 2026-03-22 12:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.09 H2=0.91
+  Paths: A=5% B=82% C=13%
+=== done ===
+[main b65d843] auto: dashboard 03-22 12:02
+ 2 files changed, 90 insertions(+), 754 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   a446b3e..b65d843  main -> main
+=== 2026-03-22 16:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.21 H2=0.79
+  Paths: A=5% B=83% C=12%
+=== done ===
+[main 3f082c7] auto: dashboard 03-22 16:01
+ 2 files changed, 80 insertions(+), 132 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   b65d843..3f082c7  main -> main
+=== 2026-03-22 20:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.14 H2=0.86
+  Paths: A=5% B=80% C=15%
+=== done ===
+[main 7cce7df] auto: dashboard 03-22 20:03
+ 2 files changed, 268 insertions(+), 88 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   3f082c7..7cce7df  main -> main
+=== 2026-03-23 08:00:03 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.14 H2=0.86
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main 05023c4] auto: dashboard 03-23 08:06
+ 2 files changed, 452 insertions(+), 112 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   7cce7df..05023c4  main -> main
+=== 2026-03-23 12:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main a8dd0e0] auto: dashboard 03-23 12:03
+ 2 files changed, 64 insertions(+), 556 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   05023c4..a8dd0e0  main -> main
+=== 2026-03-23 16:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.14 H2=0.86
+  Paths: A=5% B=80% C=15%
+=== done ===
+[main 65bc554] auto: dashboard 03-23 16:02
+ 2 files changed, 162 insertions(+), 90 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   a8dd0e0..65bc554  main -> main
+=== 2026-03-23 20:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.14 H2=0.86
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main 033c422] auto: dashboard 03-23 20:02
+ 2 files changed, 188 insertions(+), 116 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   65bc554..033c422  main -> main
+=== 2026-03-24 08:00:03 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.15 H2=0.85
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main 56fcedf] auto: dashboard 03-24 08:08
+ 2 files changed, 944 insertions(+), 120 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   033c422..56fcedf  main -> main
+=== 2026-03-24 12:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.20 H2=0.80
+  Paths: A=5% B=82% C=13%
+=== done ===
+[main 0b0c9e6] auto: dashboard 03-24 12:02
+ 2 files changed, 86 insertions(+), 1042 deletions(-)
+error: RPC failed; curl 52 Empty reply from server
+send-pack: unexpected disconnect while reading sideband packet
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+=== 2026-03-24 16:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.20 H2=0.80
+  Paths: A=7% B=81% C=12%
+=== done ===
+[main 95a59ba] auto: dashboard 03-24 16:03
+ 2 files changed, 56 insertions(+), 94 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   56fcedf..95a59ba  main -> main
+=== 2026-03-24 20:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.16 H2=0.84
+  Paths: A=7% B=82% C=11%
+=== done ===
+[main 54f8264] auto: dashboard 03-24 20:03
+ 2 files changed, 328 insertions(+), 86 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   95a59ba..54f8264  main -> main
+=== 2026-03-25 08:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.18 H2=0.82
+  Paths: A=9% B=79% C=12%
+=== done ===
+[main f1a077b] auto: dashboard 03-25 08:06
+ 2 files changed, 804 insertions(+), 160 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+ ! [remote rejected] main -> main (cannot lock ref 'refs/heads/main': is at f1a077bd8b0c9e059b1e09d2b0260b4d266ba114 but expected 54f8264252012b9381294c8eaadce85babefc99d)
+error: failed to push some refs to 'https://github.com/xiaoheiclaw/hormuz-ds.git'
+=== 2026-03-25 12:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  ⚠ Step 1 fetch: 
+  GrossGap: 16.1 mbd
+  ACH: H1=0.18 H2=0.82
+  Paths: A=8% B=81% C=12%
+=== done ===
+[main 796f449] auto: dashboard 03-25 12:01
+ 2 files changed, 30 insertions(+), 100 deletions(-)
+fatal: unable to access 'https://github.com/xiaoheiclaw/hormuz-ds.git/': LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to github.com:443 
+=== 2026-03-25 16:00:02 hormuz run ===
+Pipeline completed: 6/6 steps
+  ⚠ Step 1 fetch: 
+  GrossGap: 16.1 mbd
+  ACH: H1=0.18 H2=0.82
+  Paths: A=8% B=81% C=12%
+=== done ===
+[main 3615592] auto: dashboard 03-25 16:01
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+fatal: unable to access 'https://github.com/xiaoheiclaw/hormuz-ds.git/': LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to github.com:443 
+=== 2026-03-25 20:00:02 hormuz run ===
+Pipeline completed: 6/6 steps
+  ⚠ Step 1 fetch: 
+  GrossGap: 16.1 mbd
+  ACH: H1=0.18 H2=0.82
+  Paths: A=8% B=81% C=12%
+=== done ===
+[main bd61c8b] auto: dashboard 03-25 20:00
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   f1a077b..bd61c8b  main -> main
+=== 2026-03-26 08:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.15 H2=0.85
+  Paths: A=10% B=79% C=11%
+=== done ===
+[main 29952b1] auto: dashboard 03-26 08:07
+ 2 files changed, 534 insertions(+), 468 deletions(-)
+error: RPC failed; curl 18 transfer closed with outstanding read data remaining
+send-pack: unexpected disconnect while reading sideband packet
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+=== 2026-03-26 12:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=7% B=82% C=11%
+=== done ===
+[main 7c5d231] auto: dashboard 03-26 12:02
+ 2 files changed, 110 insertions(+), 894 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   29952b1..7c5d231  main -> main
+=== 2026-03-26 16:00:02 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=5% B=83% C=12%
+=== done ===
+[main 2d2802c] auto: dashboard 03-26 16:02
+ 2 files changed, 146 insertions(+), 138 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   7c5d231..2d2802c  main -> main
+=== 2026-03-26 20:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.16 H2=0.84
+  Paths: A=5% B=82% C=13%
+=== done ===
+[main e835f54] auto: dashboard 03-26 20:02
+ 2 files changed, 94 insertions(+), 186 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   5d6885d..e835f54  main -> main
+=== 2026-03-27 08:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  ⚠ Step 1 fetch: Failed to perform, curl: (56) Connection closed abruptly. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  GrossGap: 16.1 mbd
+  ACH: H1=0.16 H2=0.84
+  Paths: A=6% B=82% C=12%
+=== done ===
+[main 93c03ca] auto: dashboard 03-27 08:02
+ 2 files changed, 50 insertions(+), 88 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   e835f54..93c03ca  main -> main
+=== 2026-03-27 12:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.32 H2=0.68
+  Paths: A=16% B=75% C=9%
+=== done ===
+[main d55c3b9] auto: dashboard 03-27 12:09
+ 2 files changed, 952 insertions(+), 90 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   93c03ca..d55c3b9  main -> main
+=== 2026-03-27 16:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  ⚠ Step 1 fetch: 
+  GrossGap: 16.1 mbd
+  ACH: H1=0.32 H2=0.68
+  Paths: A=14% B=76% C=9%
+=== done ===
+[main 478b5d4] auto: dashboard 03-27 16:01
+ 2 files changed, 28 insertions(+), 98 deletions(-)
+fatal: unable to access 'https://github.com/xiaoheiclaw/hormuz-ds.git/': LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to github.com:443 
+=== 2026-03-27 20:00:03 hormuz run ===
+Pipeline completed: 6/6 steps
+  ⚠ Step 1 fetch: Failed to perform, curl: (56) Connection closed abruptly. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  GrossGap: 16.1 mbd
+  ACH: H1=0.32 H2=0.68
+  Paths: A=14% B=76% C=9%
+=== done ===
+[main 34d0e21] auto: dashboard 03-27 20:00
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   d55c3b9..34d0e21  main -> main
+=== 2026-03-28 08:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.29 H2=0.71
+  Paths: A=10% B=78% C=12%
+=== done ===
+[main 6878714] auto: dashboard 03-28 08:07
+ 2 files changed, 662 insertions(+), 448 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   34d0e21..6878714  main -> main
+=== 2026-03-28 12:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main b416883] auto: dashboard 03-28 12:01
+ 2 files changed, 92 insertions(+), 1060 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   6878714..b416883  main -> main
+=== 2026-03-28 16:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.13 H2=0.87
+  Paths: A=5% B=81% C=14%
+=== done ===
+[main 140f196] auto: dashboard 03-28 16:01
+ 2 files changed, 164 insertions(+), 84 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   b416883..140f196  main -> main
+=== 2026-03-28 20:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=6% B=81% C=13%
+=== done ===
+[main c4b1015] auto: dashboard 03-28 20:01
+ 2 files changed, 98 insertions(+), 210 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   140f196..c4b1015  main -> main
+=== 2026-03-29 08:00:04 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.13 H2=0.87
+  Paths: A=5% B=80% C=15%
+=== done ===
+[main 3f762a4] auto: dashboard 03-29 08:07
+ 2 files changed, 732 insertions(+), 84 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   c4b1015..3f762a4  main -> main
+=== 2026-03-29 12:00:01 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=6% B=80% C=14%
+=== done ===
+[main 5cd3eb5] auto: dashboard 03-29 12:01
+ 2 files changed, 94 insertions(+), 702 deletions(-)
+error: RPC failed; curl 52 Empty reply from server
+send-pack: unexpected disconnect while reading sideband packet
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+=== 2026-03-29 16:00:05 hormuz run ===
+Pipeline completed: 6/6 steps
+  GrossGap: 16.1 mbd
+  ACH: H1=0.19 H2=0.81
+  Paths: A=6% B=82% C=12%
+=== done ===
+[main c555469] auto: dashboard 03-29 16:02
+ 2 files changed, 56 insertions(+), 114 deletions(-)
+To https://github.com/xiaoheiclaw/hormuz-ds.git
+   3f762a4..c555469  main -> main

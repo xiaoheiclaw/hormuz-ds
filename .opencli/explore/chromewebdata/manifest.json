@@ -1,0 +1,16 @@
+{
+  "site": "chromewebdata",
+  "target_url": "https://www.centcom.mil/MEDIA/PRESS-RELEASES/",
+  "final_url": "chrome-error://chromewebdata/",
+  "title": "www.centcom.mil",
+  "framework": {
+    "vue3": false,
+    "vue2": false,
+    "react": false,
+    "nextjs": false,
+    "nuxt": false
+  },
+  "stores": [],
+  "top_strategy": "public",
+  "explored_at": "2026-03-16T10:05:22.108Z"
+}
